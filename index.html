@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Калькулятор ДомСтрой</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Макет: тёмная панель-пульт со стоимостью дома, под ней плитка калькуляторов, расчёты в модальных окнах */
+:root{
+  --bg:#F5F5F2;
+  --surface:#FFFFFF;
+  --surface-2:#EFEFEB;
+  --panel:#16191B;
+  --panel-2:#1F2426;
+  --panel-ink:#F2F3F0;
+  --panel-mute:#8E989B;
+  --ink:#16191B;
+  --muted:#6C7478;
+  --line:#E0E0DB;
+  --line-strong:#CFCFC8;
+  --accent:#D38A16;
+  --accent-ink:#1A1205;
+  --accent-soft:#F7ECD7;
+  --ok:#2E6B52;
+  --bad:#A33A22;
+  --shadow:0 20px 48px -28px rgba(14,18,20,.5);
+  --display:'Onest',system-ui,sans-serif;
+  --body:'Onest',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1012;--surface:#171A1C;--surface-2:#1E2224;--panel:#1B2022;--panel-2:#242A2C;
+  --panel-ink:#F0F2EF;--panel-mute:#949EA1;--ink:#ECEEEB;--muted:#949C9F;
+  --line:#272C2F;--line-strong:#333A3D;--accent:#E3A33C;--accent-ink:#17120A;--accent-soft:#2B2317;
+  --ok:#67B58E;--bad:#E08A6E;--shadow:0 20px 48px -28px rgba(0,0,0,.8);color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1012;--surface:#171A1C;--surface-2:#1E2224;--panel:#1B2022;--panel-2:#242A2C;
+  --panel-ink:#F0F2EF;--panel-mute:#949EA1;--ink:#ECEEEB;--muted:#949C9F;
+  --line:#272C2F;--line-strong:#333A3D;--accent:#E3A33C;--accent-ink:#17120A;--accent-soft:#2B2317;
+  --ok:#67B58E;--bad:#E08A6E;--shadow:0 20px 48px -28px rgba(0,0,0,.8);color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{width:100%;max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{margin:0;text-wrap:balance;font-family:var(--display);font-weight:700;letter-spacing:-.02em}
+h1{font-size:clamp(28px,5vw,46px);line-height:1.05}
+h2{font-size:clamp(18px,2.4vw,22px)}
+h3{font-size:16px;font-weight:600;letter-spacing:-.01em}
+p{margin:0}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* шапка */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:12}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:11;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:12px;padding-block:11px}
+.brand{display:flex;align-items:center;gap:9px;margin-right:auto;font-weight:600;letter-spacing:-.01em}
+.brand .m{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
+.brand .m svg{width:17px;height:17px;stroke:var(--accent-ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bar a.tel{font-family:var(--mono);font-size:13px;text-decoration:none;color:var(--muted)}
+.bar a.tel:hover{color:var(--accent)}
+@media(max-width:560px){.bar a.tel{display:none}}
+
+/* кнопки */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent);color:var(--accent-ink);white-space:nowrap}
+.btn:hover{filter:brightness(1.06)}
+.btn.ghost{background:transparent;border-color:var(--line-strong);color:var(--ink)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent);filter:none}
+.btn.onpanel{background:transparent;border-color:rgba(255,255,255,.22);color:var(--panel-ink)}
+.btn.onpanel:hover{border-color:var(--accent);color:var(--accent)}
+.btn.sm{padding:8px 13px;font-size:13px}
+
+/* пульт */
+.top{padding-block:clamp(22px,4vw,44px) 0}
+.top h1 span{color:var(--accent)}
+.panel{position:relative;margin-top:clamp(18px,3vw,26px);background:var(--panel);border-radius:20px;color:var(--panel-ink);box-shadow:var(--shadow);overflow:hidden;
+  background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 1px,transparent 1px 44px),repeating-linear-gradient(0deg,rgba(255,255,255,.028) 0 1px,transparent 1px 44px)}
+.panel::before{content:"";position:absolute;top:0;left:0;width:92px;height:3px;background:var(--accent)}
+.panel-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.86fr)}
+@media(max-width:800px){.panel-grid{grid-template-columns:1fr}}
+.pad{padding:clamp(18px,2.6vw,26px)}
+.ctrl{display:flex;flex-direction:column;gap:18px;min-width:0}
+.lbl{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--panel-mute);font-weight:600}
+.area-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.area-box{display:flex;align-items:baseline;gap:7px;background:var(--panel-2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 14px}
+.area-box input{border:0;background:transparent;color:var(--panel-ink);font-family:var(--mono);font-size:22px;font-weight:700;width:72px;padding:0}
+.area-box input::-webkit-outer-spin-button,.area-box input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.area-box input[type=number]{-moz-appearance:textfield}
+.area-box .u{font-size:13px;color:var(--panel-mute)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;background:rgba(255,255,255,.18);outline-offset:8px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:19px;height:19px;border-radius:50%;background:var(--accent);border:3px solid var(--panel);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:var(--accent);border:3px solid var(--panel);cursor:pointer}
+.ticks{height:9px;margin-top:7px;background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 100%);background-size:calc(100% / 19) 100%}
+.scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--panel-mute);margin-top:4px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;background:var(--panel-2);border-radius:12px;padding:5px}
+.tabs button{min-width:0;border:0;background:transparent;border-radius:9px;padding:10px 6px;cursor:pointer;color:var(--panel-mute);font-size:13px;font-weight:600;line-height:1.25}
+.tabs button small{display:block;font-family:var(--mono);font-size:10.5px;font-weight:500;opacity:.8;margin-top:3px}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tabs button:hover:not([aria-pressed="true"]){color:var(--panel-ink)}
+.out{background:var(--panel-2);display:flex;flex-direction:column;gap:16px;min-width:0;border-left:1px solid rgba(255,255,255,.07)}
+@media(max-width:800px){.out{border-left:0;border-top:1px solid rgba(255,255,255,.07)}}
+.sum{font-family:var(--mono);font-size:clamp(30px,5.4vw,42px);font-weight:700;letter-spacing:-.03em;line-height:1}
+.sum-note{font-size:12.5px;color:var(--panel-mute);margin-top:7px}
+.mini{display:flex;flex-direction:column;gap:8px}
+.mini .r{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--panel-mute)}
+.mini .r .d{flex:1;border-bottom:1px dotted rgba(255,255,255,.17);transform:translateY(-3px)}
+.mini .r b{font-family:var(--mono);font-weight:600;color:var(--panel-ink);white-space:nowrap}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.spec{border-top:1px solid rgba(255,255,255,.09)}
+.spec summary{cursor:pointer;list-style:none;padding:14px clamp(18px,2.6vw,26px);font-size:13px;font-weight:600;color:var(--panel-mute);display:flex;align-items:center;gap:8px}
+.spec summary::-webkit-details-marker{display:none}
+.spec summary:hover{color:var(--panel-ink)}
+.spec summary svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .2s}
+.spec[open] summary svg{transform:rotate(180deg)}
+.spec .in{padding:0 clamp(18px,2.6vw,26px) 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.spec h3{font-size:13.5px;color:var(--panel-ink)}
+.spec ul{margin:8px 0 0;padding-left:16px;color:var(--panel-mute);font-size:12.5px;display:grid;gap:4px}
+
+/* плитка калькуляторов */
+.sec{padding-block:clamp(28px,4.5vw,46px) 0}
+.sec h2{margin-bottom:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;min-width:0;overflow:hidden}
+.tile::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--accent);transform:scaleY(0);transform-origin:top}
+.tile:hover{border-color:var(--accent)}
+.tile:hover::after{transform:scaleY(1)}
+.tile:hover .ic{background:var(--accent-soft)}
+@media (prefers-reduced-motion:no-preference){.tile,.tile::after,.tile .ic{transition:border-color .15s,transform .15s,background .15s}.tile:hover{transform:translateY(-2px)}}
+.tile .ic{width:38px;height:38px;flex:none;border-radius:10px;background:var(--surface-2);display:grid;place-items:center}
+.tile .ic svg{width:19px;height:19px;stroke:var(--accent);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tile .t{min-width:0}
+.tile .t b{display:block;font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.tile .t span{display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.memo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 38%,transparent);border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+.memo b{font-family:var(--mono)}
+.memo button{margin-left:auto;background:none;border:0;cursor:pointer;color:var(--muted);font-size:12px;text-decoration:underline}
+
+/* модальное окно */
+.modal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal[hidden]{display:none!important}
+@media(min-width:720px){.modal{align-items:center}}
+.modal .back{position:absolute;inset:0;background:rgba(10,13,15,.6);backdrop-filter:blur(4px)}
+.box{position:relative;background:var(--surface);width:min(780px,100%);max-height:min(93vh,100%);border-radius:20px 20px 0 0;display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(min-width:720px){.box{border-radius:18px;max-height:88vh}}
+@media (prefers-reduced-motion:no-preference){.box{animation:up .2s cubic-bezier(.2,.75,.3,1)}@keyframes up{from{opacity:0;transform:translateY(16px)}}}
+.box header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.box header h2{flex:1;min-width:0;font-size:18px}
+.box .x{flex:none;width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:transparent;cursor:pointer;display:grid;place-items:center}
+.box .x:hover{border-color:var(--accent);color:var(--accent)}
+.box .x svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none}
+.box .body{overflow:auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.82fr);gap:20px;align-items:start}
+@media(max-width:700px){.box .body{grid-template-columns:1fr;gap:16px}}
+.fields{display:flex;flex-direction:column;gap:14px;min-width:0}
+.field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.field .fl{font-size:12.5px;font-weight:500;color:var(--muted)}
+.pairs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gtitle{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-top:6px;border-top:1px solid var(--line)}
+.result{background:var(--surface-2);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:11px;min-width:0;position:sticky;top:0}
+.lines{display:flex;flex-direction:column;gap:9px}
+.line{display:flex;align-items:baseline;gap:8px;font-size:13.5px}
+.line .l{color:var(--muted);flex:none;max-width:58%}
+.line .d{flex:1;border-bottom:1px dotted var(--line-strong);transform:translateY(-3px);min-width:10px}
+.line .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;text-align:right}
+.line .v s{display:block;text-decoration:none;font-family:var(--body);font-size:11px;font-weight:400;color:var(--muted)}
+.line.key{align-items:center;padding-bottom:9px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.line.key .l{font-weight:500;color:var(--ink)}
+.line.key .d{display:none}
+.line.key .v{margin-left:auto;font-size:19px;font-weight:700;color:var(--accent);letter-spacing:-.02em}
+.line.key .v s{color:var(--muted);font-weight:400}
+.hint{font-size:12px;color:var(--muted);line-height:1.45}
+.hint.bad{color:var(--bad)}
+.box footer{border-top:1px solid var(--line);padding:13px 20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* поля */
+.num{display:flex;align-items:center;gap:8px;border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:9px 12px;min-width:0}
+.num input{border:0;background:transparent;font-family:var(--mono);font-size:16px;font-weight:600;width:100%;min-width:0;padding:0;color:var(--ink)}
+.num input::-webkit-outer-spin-button,.num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.num input[type=number]{-moz-appearance:textfield}
+.seg{display:flex;gap:4px;background:var(--surface-2);border-radius:11px;padding:4px;flex-wrap:wrap}
+.seg button{flex:1 1 auto;border:0;background:transparent;border-radius:8px;padding:8px 10px;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);min-width:fit-content}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.seg button:hover:not([aria-pressed="true"]){color:var(--ink)}
+.sel{position:relative}
+.sel-btn{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:14px;cursor:pointer;text-align:left}
+.sel-btn:hover,.sel.open .sel-btn{border-color:var(--accent)}
+.sel-btn .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-btn svg{width:13px;height:13px;flex:none;stroke:var(--muted);fill:none;stroke-width:2;transition:transform .18s}
+.sel.open .sel-btn svg{transform:rotate(180deg)}
+.sel-list{position:absolute;z-index:30;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);padding:5px;max-height:268px;overflow:auto}
+.sel-list[hidden]{display:none!important}
+.sel-list .opt{padding:9px 11px;border-radius:8px;font-size:13.5px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.sel-list .opt:hover,.sel-list .opt.cur{background:var(--surface-2)}
+.sel-list .opt[aria-selected="true"]{color:var(--accent);font-weight:600}
+.sel-list .opt b{margin-left:auto;font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.sel-list{animation:pop .14s ease}@keyframes pop{from{opacity:0;transform:translateY(-5px)}}}
+.ctrl .sel-btn{background:var(--panel-2);border-color:rgba(255,255,255,.1);color:var(--panel-ink)}
+.ctrl .sel-btn svg{stroke:var(--panel-mute)}
+.ctrl .sel-btn:hover,.ctrl .sel.open .sel-btn{border-color:var(--accent)}
+.ctrl .sel-list{background:var(--panel-2);border-color:rgba(255,255,255,.12);color:var(--panel-ink)}
+.ctrl .sel-list .opt:hover,.ctrl .sel-list .opt.cur{background:rgba(255,255,255,.07)}
+.ctrl .sel-list .opt b{color:var(--panel-mute)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:7px 13px;font-size:12.5px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+.chip:hover{border-color:var(--accent)}
+.inp{border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:10px 12px;font-size:14.5px;font-family:var(--body);width:100%;color:var(--ink)}
+textarea.inp{resize:vertical;min-height:70px}
+.sent{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.sent .tick{width:40px;height:40px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center}
+.sent .tick svg{width:19px;height:19px;stroke:var(--accent);stroke-width:2.2;fill:none}
+
+/* подвал */
+.foot{margin-top:clamp(32px,5vw,56px);border-top:1px solid var(--line);background:var(--surface)}
+.foot .wrap{padding-block:20px 26px;display:flex;gap:20px 36px;flex-wrap:wrap;align-items:flex-start}
+.foot div{min-width:0}
+.foot .k{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:5px}
+.foot p{font-size:13.5px}
+.foot .fine{flex-basis:100%;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:13px}
+.cp{background:none;border:0;padding:0;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline}
+
+/* телефон */
+@media(max-width:560px){
+  .top{padding-block:18px 0}
+  h1{font-size:30px}
+  .panel{border-radius:16px;margin-top:16px}
+  .pad{padding:16px}
+  .ctrl{gap:15px}
+  .area-box input{font-size:20px;width:64px}
+  .tabs{gap:4px;padding:4px}
+  .tabs button{padding:9px 4px;font-size:12px}
+  .tabs button small{font-size:9.5px}
+  .sum{font-size:28px}
+  .acts .btn{flex:1 1 auto}
+  .scale span:nth-child(2),.scale span:nth-child(4){display:none}
+  .spec .in{grid-template-columns:1fr;gap:14px}
+  .tiles{grid-template-columns:1fr;gap:8px}
+  .tile{padding:13px;border-radius:12px}
+  .tile .ic{width:34px;height:34px}
+  .sec{padding-block:26px 0}
+  .box{border-radius:16px 16px 0 0;max-height:94vh}
+  .box header{padding:14px 16px}
+  .box header h2{font-size:17px}
+  .box .body{padding:16px}
+  .box footer{padding:12px 16px}
+  .box footer .btn{flex:1 1 auto}
+  .result{padding:14px}
+  .line.key .v{font-size:17px}
+  .foot .wrap{gap:16px 24px}
+}
+/* на телефоне результат сверху и остаётся на виду при вводе */
+@media(max-width:700px){
+  .box .body{grid-template-columns:1fr;padding-top:0}
+  .result{order:-1;position:sticky;top:0;z-index:3;border-radius:0 0 14px 14px;
+    padding-top:14px;box-shadow:0 12px 18px -16px rgba(0,0,0,.55)}
+}
+</style>
+<style>
+  :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <span class="brand"><span class="m"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg></span>ДомСтрой</span>
+    <a class="tel" href="tel:+79618177717">+7 961 817-77-17</a>
+    <button class="btn sm" data-lead="Консультация">Заявка</button>
+  </div>
+</header>
+
+<main>
+  <section class="top wrap">
+    <h1>Дом и ремонт<br><span>по цифрам</span></h1>
+
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="pad ctrl">
+          <div class="field">
+            <span class="lbl">Проект</span>
+            <div id="projSel"></div>
+          </div>
+          <div class="field">
+            <span class="lbl">Площадь дома</span>
+            <div class="area-row">
+              <span class="area-box"><input id="areaInp" type="number" min="40" max="300" step="1" value="110" inputmode="numeric" aria-label="Площадь дома в квадратных метрах"><span class="u">м²</span></span>
+            </div>
+            <input id="areaRange" type="range" min="60" max="250" step="1" value="110" aria-label="Площадь дома">
+            <div class="ticks" aria-hidden="true"></div>
+            <div class="scale"><span>60</span><span>110</span><span>160</span><span>210</span><span>250</span></div>
+          </div>
+          <div class="field">
+            <span class="lbl">Вариант</span>
+            <div class="tabs" id="tabs" role="group" aria-label="Вариант готовности"></div>
+          </div>
+        </div>
+
+        <div class="pad out">
+          <div>
+            <span class="lbl">Стоимость</span>
+            <p class="sum" id="sum">—</p>
+            <p class="sum-note" id="sumNote"></p>
+          </div>
+          <div class="mini" id="mini"></div>
+          <div class="acts">
+            <button class="btn" data-lead="Строительство дома">Смета от прораба</button>
+            <button class="btn onpanel" data-calc="mortgage">Ипотека</button>
+          </div>
+        </div>
+      </div>
+      <details class="spec">
+        <summary>Что входит в варианты <svg viewBox="0 0 24 24" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="in" id="specBody"></div>
+      </details>
+    </div>
+  </section>
+
+  <section class="sec wrap">
+    <h2>Калькуляторы</h2>
+    <div id="memo"></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <p class="k">Офис</p>
+      <p>Аксай, ул. Будённого, 138</p>
+      <p style="color:var(--muted)">Пн–Пт, 9:00–16:00</p>
+    </div>
+    <div>
+      <p class="k">Телефон</p>
+      <p class="mono">+7 961 817-77-17</p>
+      <button class="cp" data-copy="+79618177717">Скопировать</button>
+    </div>
+    <div>
+      <p class="k">Почта</p>
+      <p class="mono">info@domstroy161.ru</p>
+      <button class="cp" data-copy="info@domstroy161.ru">Скопировать</button>
+    </div>
+    <div>
+      <p class="k">Строим</p>
+      <p style="color:var(--muted)">Аксай · Ростов-на-Дону · Батайск</p>
+    </div>
+    <p class="fine">Расчёты примерные и не являются офертой. Точное количество материалов и смету считает специалист после замера.</p>
+  </div>
+</footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="back" data-close></div>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <header>
+      <h2 id="mTitle">—</h2>
+      <button class="x" data-close aria-label="Закрыть"><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="body" id="mBody"></div>
+    <footer id="mFoot"></footer>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const ru=n=>Math.round(n).toLocaleString('ru-RU');
+const dec=(n,d=1)=>n.toFixed(d).replace('.',',').replace(/,0+$/,'');
+const money=n=>ru(n)+' ₽';
+const up=n=>Math.ceil(n-1e-9);
+
+const TIERS=[
+  {k:'base',n:'Стройвариант',p:54000,d:'Коробка под свою отделку',
+   spec:['Ленточный фундамент 1000 × 400 мм','Перекрытие — армированная плита до 150 мм','Газоблок 250×625×300 с облицовочным кирпичом, стена 400 мм','Четырёхскатная крыша, металлочерепица','Окна Rehau, металлическая входная дверь','Закладные под коммуникации, дренажный колодец']},
+  {k:'fine',n:'Чистовая',p:64000,d:'Инженерия и стены под отделку',
+   spec:['Всё из «Стройварианта»','Разводка электрики','Котёл, радиаторы, тёплый пол','Сантехника до 5 мокрых точек','Полусухая стяжка','Механизированная штукатурка Knauf MP 75']},
+  {k:'turnkey',n:'Под ключ',p:92000,d:'Заходи и живи',
+   spec:['Всё из «Чистовой»','Ламинат или плитка','Межкомнатные двери','Натяжные потолки','Гипсокартонные работы','Розетки и выключатели']}
+];
+const PROJECTS=[
+  {v:81,l:'Одноэтажный 9 × 9 м',s:'81 м²'},
+  {v:100,l:'Дом с террасой',s:'100 м²'},
+  {v:104,l:'Фадеева, 189Б',s:'104 м²'},
+  {v:112,l:'х. Махин с террасой',s:'112 м²'},
+  {v:122,l:'Одноэтажный, 3 спальни',s:'122 м²'},
+  {v:145,l:'«Славино», второй свет',s:'145 м²'},
+  {v:0,l:'Своя площадь',s:''}
+];
+const TILES={'20x30':[.2,.3,3.5,.3],'25x40':[.25,.4,4,.25],'30x30':[.3,.3,4,.3],'30x60':[.3,.6,4.5,.2],'60x60':[.6,.6,5.5,.15],'60x120':[.6,1.2,7,.1]};
+const TILE_OPTS=Object.keys(TILES).map(k=>({v:k,l:k.replace('x',' × ')+' см'}));
+const POWER=[
+  {k:'ind',l:'Индукционная панель',p:7.4,c:'3 × 6 мм²',a:'32 А',r:'УЗО 30 мА'},
+  {k:'oven',l:'Духовой шкаф',p:3.5,c:'3 × 2,5 мм²',a:'16 А',r:'УЗО 30 мА'},
+  {k:'wash',l:'Стиральная машина',p:2.5,c:'3 × 2,5 мм²',a:'16 А',r:'Дифавтомат 30 мА'},
+  {k:'dish',l:'Посудомоечная машина',p:2.2,c:'3 × 2,5 мм²',a:'16 А',r:'Дифавтомат 30 мА'},
+  {k:'boil',l:'Водонагреватель',p:3,c:'3 × 2,5 мм²',a:'16 А',r:'УЗО 10 мА'},
+  {k:'cond',l:'Кондиционер',p:3.5,c:'3 × 2,5 мм²',a:'16 А',r:'—'},
+  {k:'warm',l:'Тёплый пол электрический',p:3,c:'3 × 2,5 мм²',a:'16 А',r:'УЗО 30 мА'},
+  {k:'sock',l:'Розетки в комнатах',p:3.5,c:'3 × 2,5 мм²',a:'16 А',r:'УЗО 30 мА'},
+  {k:'light',l:'Освещение',p:2,c:'3 × 1,5 мм²',a:'10 А',r:'—'}
+];
+const PROGRAMS=[
+  {v:'family',l:'Семейная',r:6,note:'лимит зависит от числа детей'},
+  {v:'it',l:'IT-ипотека',r:6,note:'для аккредитованных IT-компаний'},
+  {v:'milfam',l:'Семейная военная',r:6,note:'только на готовый дом'},
+  {v:'mil',l:'Военная (НИС)',r:18,note:'платит государство, пока вы служите'}
+];
+const LIMITS={1:6e6,2:8e6,3:10e6};
+
+let room=null,lastCalc=null;
+const state={area:110,tier:'fine'};
+
+function annuity(P,rate,years){const r=rate/100/12,n=years*12;if(r===0)return P/n;const k=Math.pow(1+r,n);return P*r*k/(k-1)}
+function balance(P,rate,years,months){const r=rate/100/12,n=years*12,k=Math.pow(1+r,n),m=Math.pow(1+r,months);return P*(k-m)/(k-1)}
+
+/* выпадающий список */
+function Select(opts,value,onChange,label){
+  const el=document.createElement('div');el.className='sel';
+  const btn=document.createElement('button');btn.type='button';btn.className='sel-btn';
+  btn.setAttribute('aria-haspopup','listbox');btn.setAttribute('aria-expanded','false');
+  if(label)btn.setAttribute('aria-label',label);
+  btn.innerHTML='<span class="v"></span><svg viewBox="0 0 24 24" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>';
+  const list=document.createElement('div');list.className='sel-list';list.setAttribute('role','listbox');list.hidden=true;
+  let val=value,cur=Math.max(0,opts.findIndex(o=>String(o.v)===String(value)));
+  const paint=()=>{
+    const o=opts.find(o=>String(o.v)===String(val))||opts[0];
+    btn.querySelector('.v').textContent=o?o.l:'—';
+    $$('.opt',list).forEach((n,i)=>{n.setAttribute('aria-selected',String(opts[i].v)===String(val));n.classList.toggle('cur',i===cur)});
+  };
+  opts.forEach((o,i)=>{
+    const n=document.createElement('div');n.className='opt';n.setAttribute('role','option');
+    n.innerHTML='<span>'+o.l+'</span>'+(o.s?'<b>'+o.s+'</b>':'');
+    n.addEventListener('click',()=>{val=o.v;cur=i;paint();close();onChange(o.v)});
+    n.addEventListener('mousemove',()=>{cur=i;paint()});
+    list.appendChild(n);
+  });
+  const away=e=>{if(!el.contains(e.target))close()};
+  const open=()=>{list.hidden=false;el.classList.add('open');btn.setAttribute('aria-expanded','true');
+    const c=$$('.opt',list)[cur];if(c)c.scrollIntoView({block:'nearest'});document.addEventListener('mousedown',away,true)};
+  const close=()=>{list.hidden=true;el.classList.remove('open');btn.setAttribute('aria-expanded','false');
+    document.removeEventListener('mousedown',away,true)};
+  btn.addEventListener('click',()=>list.hidden?open():close());
+  btn.addEventListener('keydown',e=>{
+    const k=e.key;
+    if(k==='ArrowDown'||k==='ArrowUp'||k==='Enter'||k===' '){
+      e.preventDefault();
+      if(list.hidden){open();return}
+      if(k==='Enter'||k===' '){const o=opts[cur];val=o.v;paint();close();onChange(o.v);return}
+      cur=Math.min(opts.length-1,Math.max(0,cur+(k==='ArrowDown'?1:-1)));paint();
+      $$('.opt',list)[cur].scrollIntoView({block:'nearest'});
+    } else if(k==='Escape'&&!list.hidden){e.stopPropagation();close()}
+    else if(k==='Tab'&&!list.hidden){close()}
+  });
+  el.append(btn,list);paint();return el;
+}
+function field(label,node){const f=document.createElement('div');f.className='field';
+  if(label){const l=document.createElement('span');l.className='fl';l.textContent=label;f.appendChild(l)}
+  f.appendChild(node);return f}
+function NumBox(def,onInput,step){
+  const w=document.createElement('div');w.className='num';
+  const i=document.createElement('input');i.type='number';i.value=def;i.min=0;i.step=step||0.1;i.inputMode='decimal';
+  i.addEventListener('input',()=>onInput(parseFloat(i.value.replace(',','.'))||0));
+  w.appendChild(i);return w;
+}
+function Seg(opts,value,onChange){
+  const w=document.createElement('div');w.className='seg';w.setAttribute('role','group');
+  opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.textContent=o.l;
+    b.setAttribute('aria-pressed',String(o.v)===String(value));
+    b.addEventListener('click',()=>{$$('button',w).forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true');onChange(o.v)});
+    w.appendChild(b)});
+  return w;
+}
+function Chips(opts,values,onChange){
+  const w=document.createElement('div');w.className='chips';
+  opts.forEach(o=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=o.l;
+    b.setAttribute('aria-pressed',values.includes(o.v));
+    b.addEventListener('click',()=>{const on=b.getAttribute('aria-pressed')==='true';
+      b.setAttribute('aria-pressed',String(!on));
+      if(on)values.splice(values.indexOf(o.v),1);else values.push(o.v);onChange(values)});
+    w.appendChild(b)});
+  return w;
+}
+
+/* пульт */
+const areaInp=$('#areaInp'),areaRange=$('#areaRange');
+function setArea(v,from){
+  v=Math.min(300,Math.max(20,v||0));state.area=v;
+  if(from!=='inp')areaInp.value=Math.round(v);
+  if(from!=='range')areaRange.value=Math.min(250,Math.max(60,Math.round(v)));
+  paint();
+}
+areaInp.addEventListener('input',()=>setArea(parseFloat(areaInp.value.replace(',','.')),'inp'));
+areaRange.addEventListener('input',()=>setArea(+areaRange.value,'range'));
+$('#projSel').appendChild(Select(PROJECTS,0,v=>{if(+v>0)setArea(+v)},'Проект дома'));
+
+TIERS.forEach(t=>{
+  const b=document.createElement('button');b.type='button';b.dataset.k=t.k;
+  b.innerHTML=t.n+'<small>'+ru(t.p)+' ₽/м²</small>';
+  b.setAttribute('aria-pressed',t.k===state.tier);
+  b.addEventListener('click',()=>{state.tier=t.k;
+    $$('button',$('#tabs')).forEach(x=>x.setAttribute('aria-pressed',x.dataset.k===t.k));paint()});
+  $('#tabs').appendChild(b);
+});
+$('#specBody').innerHTML=TIERS.map(t=>'<div><h3>'+t.n+' · '+ru(t.p)+' ₽/м²</h3><ul>'+t.spec.map(s=>'<li>'+s+'</li>').join('')+'</ul></div>').join('');
+
+function paint(){
+  const a=state.area,t=TIERS.find(x=>x.k===state.tier);
+  $('#sum').textContent=money(t.p*a);
+  $('#sumNote').textContent=t.n+' · '+dec(a)+' м² · '+t.d.toLowerCase();
+  const loan=t.p*a*0.8;
+  $('#mini').innerHTML=[
+    ['Срок','5–7 месяцев'],
+    ['Первый взнос 20%',money(t.p*a*0.2)],
+    ['Ипотека 6% на 20 лет',ru(annuity(loan,6,20))+' ₽/мес']
+  ].map(r=>'<span class="r">'+r[0]+'<span class="d"></span><b>'+r[1]+'</b></span>').join('');
+  lastCalc={title:'Стоимость дома',rows:[['Площадь',dec(a)+' м²'],['Вариант',t.n],['Стоимость',money(t.p*a)]]};
+}
+
+/* иконки */
+const ICON={
+  room:'<path d="M3 20V8l9-5 9 5v12"/><path d="M3 20h18"/><path d="M8 20v-6h8v6"/>',
+  bath:'<path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M6 19l-1 2M18 19l1 2"/>',
+  tile:'<path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z"/>',
+  floor:'<path d="M3 7h18M3 12h18M3 17h18"/><path d="M8 7v5M15 12v5"/>',
+  paper:'<path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M9 12h6M9 16h6"/>',
+  paint:'<path d="M5 4h12v5H5z"/><path d="M11 9v4h3v8h-4"/>',
+  plaster:'<path d="M3 16 14 5l5 5L8 21H3z"/><path d="M12 7l5 5"/>',
+  ceil:'<path d="M3 5h18"/><path d="M6 5v4M12 5v7M18 5v4"/><path d="M4 19h16"/>',
+  bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  bank:'<path d="M3 10 12 4l9 6"/><path d="M5 10v8M10 10v8M14 10v8M19 10v8"/><path d="M3 20h18"/>',
+  found:'<path d="M3 9h18v5H3z"/><path d="M6 14v6M18 14v6"/><path d="M3 9 12 4l9 5"/>'
+};
+
+const CALCS={
+  room:{icon:'room',title:'Комната',hint:'Пол, стены, откосы',
+    fields:[
+      {k:'len',t:'num',g:'Размеры',l:'Длина, м',def:4.5,half:1},
+      {k:'wid',t:'num',l:'Ширина, м',def:3.2,half:1},
+      {k:'hei',t:'seg',l:'Высота потолка',def:2.7,opts:[{v:2.5,l:'2,5 м'},{v:2.7,l:'2,7 м'},{v:3,l:'3 м'}]},
+      {k:'win',t:'num',g:'Проёмы',l:'Окон, шт.',def:1,half:1,step:1},
+      {k:'dor',t:'num',l:'Дверей, шт.',def:1,half:1,step:1},
+      {k:'winW',t:'num',l:'Ширина окна, м',def:1.4,half:1},
+      {k:'winH',t:'num',l:'Высота окна, м',def:1.5,half:1},
+      {k:'dorW',t:'num',l:'Ширина двери, м',def:0.9,half:1},
+      {k:'dorH',t:'num',l:'Высота двери, м',def:2.1,half:1},
+      {k:'dep',t:'sel',l:'Глубина откоса',def:0.2,opts:[{v:0.1,l:'10 см'},{v:0.15,l:'15 см'},{v:0.2,l:'20 см'},{v:0.25,l:'25 см'},{v:0.3,l:'30 см'}]}
+    ],
+    calc(v){
+      const floor=v.len*v.wid,per=2*(v.len+v.wid);
+      const hole=v.win*v.winW*v.winH+v.dor*v.dorW*v.dorH;
+      const walls=Math.max(0,per*v.hei-hole);
+      const slope=v.win*(v.winW+2*v.winH)*v.dep+v.dor*(v.dorW+2*v.dorH)*v.dep;
+      return{rows:[['Пол',dec(floor)+' м²','','k'],['Периметр',dec(per)+' м'],
+        ['Стены',dec(walls)+' м²','проёмы вычтены'],['Откосы',dec(slope)+' м²'],['Объём',dec(floor*v.hei)+' м³']],
+        hint:'Запомните комнату — размеры подставятся в другие расчёты.',
+        memo:{floor,per,walls,slope,hei:v.hei}};
+    }},
+  bath:{icon:'bath',title:'Санузел',hint:'Плитка, клей, гидроизоляция',
+    fields:[
+      {k:'kind',t:'seg',l:'Тип',def:'both',opts:[{v:'both',l:'Совмещённый'},{v:'bath',l:'Ванная'},{v:'wc',l:'Туалет'}]},
+      {k:'len',t:'num',g:'Размеры',l:'Длина, м',def:2,half:1},
+      {k:'wid',t:'num',l:'Ширина, м',def:1.7,half:1},
+      {k:'up',t:'sel',l:'Высота укладки',def:2.5,opts:[{v:2.5,l:'До потолка — 2,5 м'},{v:2.1,l:'До верха двери — 2,1 м'},{v:1.2,l:'Фартук — 1,2 м'},{v:0,l:'Только пол'}]},
+      {k:'ft',t:'sel',g:'Плитка',l:'На пол',def:'60x60',opts:TILE_OPTS},
+      {k:'wt',t:'sel',l:'На стены',def:'30x60',opts:TILE_OPTS},
+      {k:'ex',t:'multi',l:'Что внутри',def:['door','tub'],opts:[{v:'door',l:'Дверь'},{v:'tub',l:'Ванна с экраном'},{v:'shower',l:'Душевая'},{v:'box',l:'Короб'}]}
+    ],
+    calc(v){
+      const floor=v.len*v.wid,per=2*(v.len+v.wid),ex=v.ex||[];
+      let walls=per*v.up;
+      if(v.up>0){
+        if(ex.includes('door'))walls-=0.8*Math.min(2,v.up);
+        if(ex.includes('tub'))walls+=Math.max(v.len,v.wid)*0.6;
+        if(ex.includes('box'))walls+=1.5;
+      }
+      walls=Math.max(0,walls);
+      const F=TILES[v.ft],W=TILES[v.wt];
+      const fQ=floor*1.15,wQ=walls*1.15;
+      const fN=up(fQ/(F[0]*F[1])),wN=walls>0?up(wQ/(W[0]*W[1])):0;
+      const glue=floor*F[2]+walls*W[2],grout=floor*F[3]+walls*W[3];
+      const hydro=(floor+per*0.2+(ex.includes('shower')?4.8:0))*1.5;
+      const rows=[['Плитка на пол',fN+' шт.',dec(fQ)+' м² с запасом 15%','k']];
+      if(walls>0)rows.push(['Плитка на стены',dec(wQ)+' м² · '+wN+' шт.','запас 15%']);
+      rows.push(['Клей',up(glue/25)+' меш.',ru(glue)+' кг']);
+      rows.push(['Затирка',dec(Math.max(1,grout))+' кг']);
+      rows.push(['Крестики',ru((fN+wN)*4)+' шт.']);
+      rows.push(['Грунтовка',dec((floor+walls)*0.2)+' л']);
+      rows.push(['Гидроизоляция',ru(hydro)+' кг','пол и 20 см стен']);
+      return{rows,hint:'Стены: периметр × высоту укладки, минус дверь, плюс экран ванны и короб.'};
+    }},
+  tile:{icon:'tile',title:'Плитка',hint:'Пол или стены',
+    fields:[
+      {k:'where',t:'seg',l:'Поверхность',def:'floor',opts:[{v:'floor',l:'Пол'},{v:'wall',l:'Стены'}]},
+      {k:'area',t:'num',l:'Площадь, м²',def:10,useRoom:'floor'},
+      {k:'size',t:'sel',l:'Размер плитки',def:'30x60',opts:TILE_OPTS},
+      {k:'lay',t:'seg',l:'Укладка',def:1.1,opts:[{v:1.1,l:'Прямая'},{v:1.15,l:'Диагональ'}]}
+    ],
+    calc(v){
+      const T=TILES[v.size],q=v.area*v.lay,n=up(q/(T[0]*T[1]));
+      return{rows:[['Плитка',n+' шт.',dec(q)+' м², запас '+Math.round((v.lay-1)*100)+'%','k'],
+        ['Клей',up(v.area*T[2]/25)+' меш.',ru(v.area*T[2])+' кг'],
+        ['Затирка',dec(Math.max(1,v.area*T[3]))+' кг'],
+        ['Крестики',ru(n*4)+' шт.'],
+        ['Грунтовка',dec(v.area*0.2)+' л']],
+        hint:'Запас берём только на плитку, клей и затирку — на чистую площадь.'};
+    }},
+  laminate:{icon:'floor',title:'Ламинат',hint:'Упаковки, подложка, плинтус',
+    fields:[
+      {k:'area',t:'num',l:'Площадь пола, м²',def:15,useRoom:'floor'},
+      {k:'lay',t:'seg',l:'Укладка',def:1.05,opts:[{v:1.05,l:'Прямая'},{v:1.15,l:'Диагональ'},{v:1.15,l:'Ёлочка'}]},
+      {k:'pack',t:'sel',l:'В упаковке',def:2,opts:[{v:1.8,l:'1,8 м²'},{v:2,l:'2 м²'},{v:2.4,l:'2,4 м²'}]},
+      {k:'per',t:'num',l:'Периметр, м',def:15.4,useRoom:'per',half:1},
+      {k:'dor',t:'num',l:'Проёмы, м',def:0.9,half:1}
+    ],
+    calc(v){
+      const q=v.area*v.lay,pl=up(Math.max(0,v.per-v.dor)*1.05/2.5);
+      return{rows:[['Ламинат',up(q/v.pack)+' упак.',dec(q)+' м² с запасом','k'],
+        ['Подложка',dec(v.area)+' м²'],
+        ['Плинтус',pl+' шт.','по 2,5 м'],
+        ['Углы и соединители',(pl+4)+' шт.']],
+        hint:'Ёлочка и диагональ дают больше подрезки — запас 15%.'};
+    }},
+  wallpaper:{icon:'paper',title:'Обои',hint:'Рулоны и клей',
+    fields:[
+      {k:'per',t:'num',l:'Периметр комнаты, м',def:15.4,useRoom:'per'},
+      {k:'hei',t:'seg',l:'Высота потолка',def:2.7,opts:[{v:2.5,l:'2,5 м'},{v:2.7,l:'2,7 м'},{v:3,l:'3 м'}]},
+      {k:'w',t:'sel',l:'Ширина рулона',def:1.06,opts:[{v:1.06,l:'1,06 м — метровые'},{v:0.53,l:'0,53 м — узкие'}]},
+      {k:'len',t:'sel',l:'Длина рулона',def:10,opts:[{v:10,l:'10 м'},{v:12,l:'12 м'},{v:15,l:'15 м'}]},
+      {k:'rap',t:'seg',l:'Рисунок',def:0,opts:[{v:0,l:'Без подгона'},{v:0.32,l:'С подгоном'}]},
+      {k:'dor',t:'num',l:'Ширина проёмов, м',def:1.7}
+    ],
+    calc(v){
+      const need=Math.max(0,v.per-v.dor),strips=up(need/v.w);
+      const perRoll=Math.max(1,Math.floor(v.len/(v.hei+v.rap))),rolls=up(strips/perRoll);
+      return{rows:[['Рулонов',rolls+' шт.','с запасом '+(rolls+1),'k'],
+        ['Полос нужно',strips+' шт.'],
+        ['Из рулона выходит',perRoll+' полос'],
+        ['Клей',up(rolls/(v.w>1?3:6))+' пачк.']],
+        hint:'Подгон рисунка считаем 32 см. Для крупного раппорта берите рулон про запас.'};
+    }},
+  paint:{icon:'paint',title:'Краска',hint:'Стены, потолок, откосы',
+    fields:[
+      {k:'what',t:'seg',l:'Что красим',def:'walls',opts:[{v:'walls',l:'Стены'},{v:'ceil',l:'Потолок'},{v:'both',l:'Всё'},{v:'slope',l:'Откосы'}]},
+      {k:'area',t:'num',l:'Площадь пола, м²',def:15,useRoom:'floor'},
+      {k:'hei',t:'seg',l:'Высота потолка',def:2.7,opts:[{v:2.5,l:'2,5 м'},{v:2.7,l:'2,7 м'},{v:3,l:'3 м'}]},
+      {k:'coats',t:'seg',l:'Слоёв',def:2,opts:[{v:1,l:'1 слой'},{v:2,l:'2 слоя'}]},
+      {k:'win',t:'num',l:'Окон, шт.',def:1,half:1,step:1},
+      {k:'dor',t:'num',l:'Дверей, шт.',def:1,half:1,step:1}
+    ],
+    calc(v){
+      const per=room?room.per:4*Math.sqrt(v.area);
+      const slope=v.win*(1.4+2*1.5)*0.2+v.dor*(0.9+2*2.1)*0.2;
+      const walls=room&&room.walls?room.walls:Math.max(0,per*v.hei-v.win*2.1-v.dor*1.9);
+      let area,what;
+      if(v.what==='walls'){area=walls+slope;what='стены и откосы'}
+      else if(v.what==='ceil'){area=v.area;what='потолок'}
+      else if(v.what==='both'){area=walls+slope+v.area;what='стены, откосы, потолок'}
+      else{area=slope;what='только откосы'}
+      const litres=area*v.coats/8;
+      const can=[0.9,2.5,5,9].find(c=>litres<=c);
+      return{rows:[['Красим',dec(area)+' м²',what],
+        ['Краска',dec(litres)+' л',v.coats+' слоя, 1 л ≈ 8 м²','k'],
+        ['Банка',can?dec(can)+' л':'две по 9 л'],
+        ['Грунтовка',dec(area/8)+' л','один слой']],
+        hint:'Откосы: (ширина + 2 × высота проёма) × 20 см глубины.'};
+    }},
+  plaster:{icon:'plaster',title:'Штукатурка',hint:'Мешки, маяки, грунт',
+    fields:[
+      {k:'area',t:'num',l:'Площадь стен, м²',def:40,useRoom:'walls'},
+      {k:'mm',t:'seg',l:'Слой',def:20,opts:[{v:10,l:'10 мм'},{v:20,l:'20 мм'},{v:30,l:'30 мм'}]},
+      {k:'mix',t:'sel',l:'Смесь',def:0.9,opts:[{v:0.9,l:'Гипсовая Knauf MP 75'},{v:1.6,l:'Цементная'},{v:1.1,l:'Финишная шпаклёвка'}]},
+      {k:'bag',t:'sel',l:'Мешок',def:30,opts:[{v:25,l:'25 кг'},{v:30,l:'30 кг'}]}
+    ],
+    calc(v){
+      const kg=v.area*v.mm*v.mix,line=v.area/2.7;
+      return{rows:[['Смесь',up(kg/v.bag)+' меш.',ru(kg)+' кг','k'],
+        ['Маяки',up(line/1.3)+' шт.','шаг 1,3 м'],
+        ['Уголки',up(line/6)+' шт.'],
+        ['Грунтовка',dec(v.area*0.2)+' л']],
+        hint:'Механизированная штукатурка сохнет 7–10 дней, работы идут в 2–3 раза быстрее.'};
+    }},
+  ceiling:{icon:'ceil',title:'Потолок',hint:'Натяжной или гипсокартон',
+    fields:[
+      {k:'type',t:'seg',l:'Тип',def:'stretch',opts:[{v:'stretch',l:'Натяжной'},{v:'gkl',l:'Гипсокартон'}]},
+      {k:'area',t:'num',l:'Площадь, м²',def:15,useRoom:'floor',half:1},
+      {k:'per',t:'num',l:'Периметр, м',def:15.4,useRoom:'per',half:1},
+      {k:'lamps',t:'num',l:'Светильников, шт.',def:4,step:1},
+      {k:'lvl',t:'seg',l:'Уровней',def:1,opts:[{v:1,l:'1 уровень'},{v:1.4,l:'2 уровня'}]}
+    ],
+    calc(v){
+      if(v.type==='stretch')return{rows:[['Полотно',dec(v.area*1.05)+' м²','запас 5%','k'],
+        ['Багет',dec(v.per*1.05)+' м'],
+        ['Закладные',up(v.lamps)+' шт.','под светильники']],
+        hint:'Натяжной потолок кроят по замеру — размеры нужны точные.'};
+      const s=v.area,k=v.lvl;
+      return{rows:[['Листы ГКЛ',up(s*1.1/3)+' шт.','1,2 × 2,5 м','k'],
+        ['Профиль ПП 60×27',up(s*3*k/3)+' шт.','по 3 м'],
+        ['Профиль ПН 28×27',up(v.per/3)+' шт.'],
+        ['Подвесы',up(s*3*k)+' шт.'],
+        ['Саморезы',ru(up(s*25*k))+' шт.'],
+        ['Лента и шпаклёвка',dec(s*1.2)+' м · '+dec(s*0.5)+' кг']],
+        hint:'Во влажных помещениях — ГКЛВ. Для двух уровней профиля и подвесов на 40% больше.'};
+    }},
+  foundation:{icon:'found',title:'Фундамент и стены',hint:'Бетон, блок, кирпич',
+    fields:[
+      {k:'len',t:'num',g:'Дом',l:'Длина, м',def:10,half:1},
+      {k:'wid',t:'num',l:'Ширина, м',def:12,half:1},
+      {k:'inner',t:'num',l:'Внутренние несущие стены, м',def:10},
+      {k:'w',t:'sel',g:'Лента',l:'Ширина',def:0.4,opts:[{v:0.3,l:'300 мм'},{v:0.4,l:'400 мм — наш стандарт'},{v:0.5,l:'500 мм'}]},
+      {k:'h',t:'sel',l:'Глубина',def:1,opts:[{v:0.8,l:'800 мм'},{v:1,l:'1000 мм — наш стандарт'},{v:1.2,l:'1200 мм'}]},
+      {k:'wall',t:'seg',g:'Стены',l:'Высота',def:3,opts:[{v:2.8,l:'2,8 м'},{v:3,l:'3 м'},{v:3.2,l:'3,2 м'}]},
+      {k:'holes',t:'num',l:'Проёмы, м²',def:18}
+    ],
+    calc(v){
+      const per=2*(v.len+v.wid),run=per+v.inner;
+      const conc=run*v.w*v.h*1.05,rebar=run*4*1.1;
+      const wallA=Math.max(0,per*v.wall-v.holes);
+      return{rows:[['Длина ленты',dec(run)+' м'],
+        ['Бетон',dec(conc)+' м³',up(conc/6)+' миксера по 6 м³','k'],
+        ['Арматура ⌀12',ru(rebar)+' м','4 нитки'],
+        ['Песок на подушку',dec(run*v.w*0.3)+' м³'],
+        ['Опалубка',dec(run*v.h*2)+' м²'],
+        ['Газоблок',ru(up(wallA*0.3/0.0469))+' шт.',dec(wallA*0.3)+' м³'],
+        ['Клей для блоков',ru(wallA*0.3*27)+' кг'],
+        ['Облицовочный кирпич',ru(up(wallA*51))+' шт.','51 шт. на м²']],
+        hint:'Считаем по нашему стандарту: лента 400 × 1000 мм, стена 400 мм.'};
+    }},
+  electric:{icon:'bolt',title:'Электрика',hint:'Кабель и автоматы',
+    fields:[
+      {k:'items',t:'multi',l:'Что подключаем',def:['ind','oven','wash','sock','light'],opts:POWER.map(p=>({v:p.k,l:p.l}))},
+      {k:'limit',t:'sel',l:'Выделенная мощность',def:15,opts:[{v:5,l:'5 кВт'},{v:10,l:'10 кВт'},{v:15,l:'15 кВт — обычно для ИЖС'}]}
+    ],
+    calc(v){
+      const picked=POWER.filter(p=>(v.items||[]).includes(p.k));
+      const rows=picked.map(p=>[p.l,p.c,p.a+(p.r!=='—'?' · '+p.r:'')]);
+      const sum=picked.reduce((a,p)=>a+p.p,0),real=sum*0.7,ok=real<=v.limit;
+      rows.push(['Мощность',dec(sum)+' кВт','с одновременностью '+dec(real)+' кВт']);
+      rows.push([ok?'Лимита хватает':'Лимита не хватает',ok?dec(v.limit)+' кВт':'нужно '+dec(real)+' кВт','','k']);
+      return{rows,hint:'Справочно. Монтаж делает электрик по проекту, кабель медный ВВГнг(А)-LS.',bad:!ok};
+    }},
+  mortgage:{icon:'bank',title:'Ипотека',hint:'Платёж по программам',
+    fields:[
+      {k:'prog',t:'sel',l:'Программа',def:'family',opts:PROGRAMS.map(p=>({v:p.v,l:p.l,s:p.r+'%'}))},
+      {k:'kids',t:'seg',l:'Детей',def:2,opts:[{v:1,l:'1'},{v:2,l:'2'},{v:3,l:'3 и больше'}]},
+      {k:'price',t:'num',l:'Стоимость дома, ₽',def:7000000,step:100000},
+      {k:'down',t:'seg',l:'Первый взнос',def:20,opts:[{v:10,l:'10%'},{v:20,l:'20%'},{v:30,l:'30%'},{v:50,l:'50%'}]},
+      {k:'term',t:'seg',l:'Срок',def:20,opts:[{v:15,l:'15 лет'},{v:20,l:'20 лет'},{v:25,l:'25 лет'},{v:30,l:'30 лет'}]}
+    ],
+    calc(v){
+      const P=PROGRAMS.find(p=>p.v===v.prog)||PROGRAMS[0];
+      const down=v.price*v.down/100,loan=v.price-down;
+      const rows=[['Программа',P.l+', '+P.r+'%',P.note],
+        ['Первый взнос',money(down),v.down+'%'],
+        ['Кредит',money(loan),v.term+' лет']];
+      if(v.prog==='family'){
+        const lim=LIMITS[v.kids];
+        rows.push(['Лимит',money(lim),loan<=lim?'проходит':'превышен на '+money(loan-lim)]);
+      }
+      rows.push([v.term>15?'Платёж до 15 лет':'Платёж',ru(annuity(loan,P.r,v.term))+' ₽/мес','','k']);
+      if(v.term>15){
+        const bal=balance(loan,P.r,v.term,180);
+        rows.push(['Платёж после 15 лет',ru(annuity(bal,10,v.term-15))+' ₽/мес','ставка не выше 10%']);
+      }
+      return{rows,hint:'Субсидирование ставки действует 15–30 лет. Ставку подтверждает банк.',bad:v.prog==='milfam'};
+    }}
+};
+const ORDER=['room','bath','tile','laminate','wallpaper','paint','plaster','ceiling','foundation','electric','mortgage'];
+
+ORDER.forEach(id=>{
+  const c=CALCS[id];
+  const b=document.createElement('button');b.className='tile';b.type='button';b.dataset.calc=id;
+  b.innerHTML='<span class="ic"><svg viewBox="0 0 24 24">'+ICON[c.icon]+'</svg></span>'+
+    '<span class="t"><b>'+c.title+'</b><span>'+c.hint+'</span></span>';
+  $('#tiles').appendChild(b);
+});
+
+function paintMemo(){
+  const m=$('#memo');
+  if(!room){m.innerHTML='';return}
+  m.innerHTML='<div class="memo">Комната: пол <b>'+dec(room.floor)+' м²</b>, стены <b>'+dec(room.walls)+' м²</b>, периметр <b>'+dec(room.per)+' м</b><button type="button">Забыть</button></div>';
+  $('.memo button',m).addEventListener('click',()=>{room=null;paintMemo()});
+}
+
+/* модальное окно */
+const modal=$('#modal'),box=$('.box',modal);
+let lastFocus=null;
+function openModal(){lastFocus=document.activeElement;modal.hidden=false;document.body.style.overflow='hidden';
+  const f=box.querySelector('button,input');if(f)f.focus()}
+function closeModal(){modal.hidden=true;document.body.style.overflow='';if(lastFocus)lastFocus.focus()}
+modal.addEventListener('click',e=>{if(e.target.closest('[data-close]'))closeModal()});
+document.addEventListener('keydown',e=>{
+  if(modal.hidden)return;
+  if(e.key==='Escape'){closeModal();return}
+  if(e.key!=='Tab')return;
+  const f=$$('button,input,textarea,[href]',box).filter(n=>!n.disabled&&n.offsetParent!==null);
+  if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+});
+
+function openCalc(id){
+  const c=CALCS[id];if(!c)return;
+  const v={};c.fields.forEach(f=>{v[f.k]=Array.isArray(f.def)?f.def.slice():f.def});
+  if(room)c.fields.forEach(f=>{
+    if(f.useRoom==='per')v[f.k]=+room.per.toFixed(1);
+    else if(f.useRoom==='walls')v[f.k]=+room.walls.toFixed(1);
+    else if(f.useRoom==='floor')v[f.k]=+room.floor.toFixed(1);
+  });
+  $('#mTitle').textContent=c.title;
+  const body=$('#mBody');body.innerHTML='';body.style.gridTemplateColumns='';
+  const fields=document.createElement('div');fields.className='fields';
+  const result=document.createElement('div');result.className='result';
+  let buf=null;
+  const flush=()=>{if(buf){fields.appendChild(buf);buf=null}};
+  c.fields.forEach(f=>{
+    if(f.g){flush();const t=document.createElement('p');t.className='gtitle';t.textContent=f.g;fields.appendChild(t)}
+    let node;
+    if(f.t==='num')node=NumBox(v[f.k],x=>{v[f.k]=x;render()},f.step);
+    else if(f.t==='sel')node=Select(f.opts,v[f.k],x=>{v[f.k]=isNaN(+x)?x:+x;render()},f.l);
+    else if(f.t==='seg')node=Seg(f.opts,v[f.k],x=>{v[f.k]=isNaN(+x)?x:+x;render()});
+    else node=Chips(f.opts,v[f.k],()=>render());
+    const w=field(f.l,node);
+    if(f.half){
+      if(!buf){buf=document.createElement('div');buf.className='pairs'}
+      buf.appendChild(w);
+      if(buf.children.length===2)flush();
+    } else {flush();fields.appendChild(w)}
+  });
+  flush();
+  body.append(fields,result);
+
+  function render(){
+    const out=c.calc(v);
+    result.innerHTML='<div class="lines">'+out.rows.map(r=>
+      '<span class="line'+(r[3]==='k'?' key':'')+'"><span class="l">'+r[0]+'</span><span class="d"></span><span class="v">'+r[1]+(r[2]?'<s>'+r[2]+'</s>':'')+'</span></span>').join('')+'</div>'+
+      '<p class="hint'+(out.bad?' bad':'')+'">'+out.hint+'</p>';
+    lastCalc={title:c.title,rows:out.rows.map(r=>[r[0],r[1]])};
+    const foot=$('#mFoot');foot.innerHTML='';
+    if(out.memo){
+      const b=document.createElement('button');b.className='btn ghost sm';b.type='button';
+      b.textContent=room?'Обновить комнату':'Запомнить комнату';
+      b.addEventListener('click',()=>{room=out.memo;paintMemo();b.textContent='Запомнено';
+        setTimeout(()=>b.textContent='Обновить комнату',1500)});
+      foot.appendChild(b);
+    }
+    const copy=document.createElement('button');copy.className='btn ghost sm';copy.type='button';copy.textContent='Копировать';
+    copy.addEventListener('click',()=>{
+      const txt=c.title+'\n'+out.rows.map(r=>r[0]+': '+r[1]).join('\n');
+      (navigator.clipboard&&navigator.clipboard.writeText(txt)||Promise.reject())
+        .then(()=>{copy.textContent='Скопировано';setTimeout(()=>copy.textContent='Копировать',1500)})
+        .catch(()=>{copy.textContent='Выделите текст';setTimeout(()=>copy.textContent='Копировать',1800)});
+    });
+    const lead=document.createElement('button');lead.className='btn sm';lead.type='button';lead.textContent='Отправить менеджеру';
+    lead.addEventListener('click',()=>openLead(c.title));
+    foot.append(copy,lead);
+  }
+  render();openModal();
+}
+
+function openLead(src){
+  $('#mTitle').textContent='Заявка';
+  const body=$('#mBody');body.innerHTML='';body.style.gridTemplateColumns='1fr';
+  const form=document.createElement('form');form.className='fields';form.noValidate=true;
+  form.innerHTML='<div class="field"><label class="fl" for="lName">Имя</label><input class="inp" id="lName" autocomplete="name"></div>'+
+    '<div class="field"><label class="fl" for="lPhone">Телефон</label><input class="inp" id="lPhone" inputmode="tel" autocomplete="tel" placeholder="+7 900 000-00-00"></div>'+
+    '<div class="field"><span class="fl">Как связаться</span><div id="lWay"></div></div>'+
+    '<div class="field"><label class="fl" for="lMsg">Комментарий</label><textarea class="inp" id="lMsg"></textarea></div>'+
+    '<p class="hint" id="lCalc"></p><p class="hint bad" id="lErr" hidden></p>';
+  body.appendChild(form);
+  let way='call';
+  $('#lWay',form).appendChild(Select([{v:'call',l:'Позвонить'},{v:'tg',l:'Telegram'},{v:'wa',l:'WhatsApp'}],way,x=>way=x,'Способ связи'));
+  const parts=[src||'Консультация'];
+  if(lastCalc)parts.push(lastCalc.rows.map(r=>r[0]+' '+r[1]).join(', '));
+  $('#lCalc',form).textContent='К заявке приложим расчёт: '+parts.join(' — ');
+  const foot=$('#mFoot');foot.innerHTML='';
+  const send=document.createElement('button');send.className='btn';send.type='button';send.textContent='Отправить';
+  const note=document.createElement('p');note.className='hint';note.style.flex='1';
+  note.textContent='Отправляя, вы соглашаетесь на обработку персональных данных.';
+  foot.append(send,note);
+  const submit=()=>{
+    const n=$('#lName',form).value.trim(),p=$('#lPhone',form).value.replace(/\D/g,''),err=$('#lErr',form);
+    if(n.length<2){err.textContent='Напишите, как к вам обращаться.';err.hidden=false;$('#lName',form).focus();return}
+    if(p.length<10){err.textContent='Телефон нужен с кодом города или оператора.';err.hidden=false;$('#lPhone',form).focus();return}
+    body.innerHTML='<div class="sent"><span class="tick"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg></span>'+
+      '<h3>Готово, '+n+'</h3>'+
+      '<p class="hint">В рабочей версии заявка уходит менеджеру в Telegram и в Google Таблицу вместе с расчётом. Это демонстрация — данные остаются в браузере.</p>'+
+      '<p class="hint">Прямой телефон: <span class="mono">+7 961 817-77-17</span>, пн–пт с 9:00 до 16:00.</p></div>';
+    foot.innerHTML='';
+    const ok=document.createElement('button');ok.className='btn';ok.type='button';ok.textContent='Закрыть';
+    ok.addEventListener('click',closeModal);foot.appendChild(ok);ok.focus();
+  };
+  send.addEventListener('click',submit);
+  form.addEventListener('submit',e=>{e.preventDefault();submit()});
+  openModal();
+}
+
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-calc]');if(c){openCalc(c.dataset.calc);return}
+  const l=e.target.closest('[data-lead]');if(l){openLead(l.dataset.lead);return}
+  const cp=e.target.closest('[data-copy]');
+  if(cp){const old=cp.textContent;
+    (navigator.clipboard&&navigator.clipboard.writeText(cp.dataset.copy)||Promise.reject())
+      .then(()=>{cp.textContent='Скопировано';setTimeout(()=>cp.textContent=old,1500)})
+      .catch(()=>{cp.textContent='Выделите вручную';setTimeout(()=>cp.textContent=old,1800)})}
+});
+paint();paintMemo();
+})();
+</script>
+</body>
+</html>
