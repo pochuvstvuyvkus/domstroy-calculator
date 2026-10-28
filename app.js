@@ -65,6 +65,15 @@ var TIERS = [
 ];
 
 var PROJECTS = [{
+  id: 'p79',
+  title: 'Одноэтажный дом 79,4 м²',
+  area: 79.4,
+  rooms: 'Кухня-гостиная 28,7 м² · три комнаты · санузел · котельная',
+  descr: 'Компактный дом 8,2 × 12,1 м: большая кухня-гостиная с окнами на две стороны, ' +
+         'три комнаты, санузел и котельная. Облицовка кирпичом, четырёхскатная крыша.',
+  photos: ['img/proj/p79/1.jpg', 'img/proj/p79/2.jpg', 'img/proj/p79/3.jpg'],
+  plans: [['img/proj/p79/plan.jpg', 'Планировка']]
+}, {
   id: 'p92',
   title: 'Одноэтажный дом 92,35 м²',
   area: 92.35,
@@ -72,28 +81,123 @@ var PROJECTS = [{
   descr: 'Кухня-гостиная с выходом на участок, три спальни, раздельный санузел с ванной, ' +
          'котельная и гардеробная. Облицовка кирпичом, четырёхскатная крыша из металлочерепицы.',
   photos: ['img/p1.jpg', 'img/p2.jpg', 'img/p3.jpg'],
-  plan: 'img/plan.jpg',
-  built: true
+  plans: [['img/plan.jpg', 'Планировка']],
+  built: 'kalinina'
+}, {
+  id: 'pdruzhba',
+  title: 'Двухэтажный дом, НСТ Дружба',
+  area: 110,
+  rooms: 'Гостиная 32,6 м² · четыре комнаты наверху · балкон',
+  descr: 'Два этажа: внизу гостиная 32,6 м², кухня и санузел, наверху четыре комнаты и санузел, ' +
+         'над крыльцом — балкон. Общая площадь по планировкам около 110 м².',
+  photos: ['img/proj/pdruzhba/1.jpg', 'img/proj/pdruzhba/2.jpg'],
+  plans: [['img/proj/pdruzhba/plan.jpg', 'Планировка первого этажа'],
+          ['img/proj/pdruzhba/plan2.jpg', 'Планировка второго этажа']]
+}, {
+  id: 'p145',
+  title: 'Одноэтажный дом 145,1 м²',
+  area: 145.1,
+  rooms: 'Гостиная 26,9 м² · четыре спальни · санузлы · терраса',
+  descr: 'Просторный дом 17,7 × 11,2 м: гостиная с панорамным остеклением, четыре спальни, ' +
+         'санузлы, котельная и терраса под общей крышей. Фасад — светлый кирпич и дерево.',
+  photos: ['img/proj/p145/1.jpg', 'img/proj/p145/2.jpg', 'img/proj/p145/3.jpg', 'img/proj/p145/4.jpg'],
+  plans: [['img/proj/p145/plan.jpg', 'Планировка']],
+  built: 'slavino'
 }];
 
-var BUILT = [
-  ['img/h01.jpg', 'Фасад со стороны входа'],
-  ['img/h02.jpg', 'Кладка клинкерного кирпича вблизи'],
-  ['img/h03.jpg', 'Окно и отлив, вид сбоку'],
-  ['img/h04.jpg', 'Главный фасад вечером'],
-  ['img/h05.jpg', 'Дом на участке'],
-  ['img/h06.jpg', 'Боковой фасад'],
-  ['img/h07.jpg', 'Кухня-гостиная после штукатурки'],
-  ['img/h08.jpg', 'Стена под отделку, выведены розетки'],
-  ['img/h09.jpg', 'Коридор и проёмы'],
-  ['img/h10.jpg', 'Спальня, окно на участок'],
-  ['img/h11.jpg', 'Спальня после механизированной штукатурки'],
-  ['img/h12.jpg', 'Санузел, подготовка под плитку'],
-  ['img/h13.jpg', 'Котельная с закладными'],
-  ['img/h14.jpg', 'Проёмы и откосы'],
-  ['img/h15.jpg', 'Задний фасад'],
-  ['img/h16.jpg', 'Дом перед сдачей']
-];
+// построенные дома: подпись к каждой фотографии видно в просмотре
+var OBJECTS = [{
+  slug: 'kalinina', title: 'Калинина 2а', note: 'Одноэтажный дом 92,35 м² в тёмном кирпиче',
+  facts: [['Площадь', '92,35 м²'], ['Срок строительства', '6 месяцев'], ['Стены', 'газоблок + кирпич']],
+  photos: [
+    ['img/obj/kalinina/1.jpg', 'Главный фасад с крыльцом'],
+    ['img/obj/kalinina/2.jpg', 'Угол дома и колонны крыльца'],
+    ['img/h01.jpg', 'Фасад со стороны входа'],
+    ['img/h04.jpg', 'Главный фасад вечером'],
+    ['img/obj/kalinina/3.jpg', 'Боковой фасад с окнами'],
+    ['img/obj/kalinina/4.jpg', 'Дом на участке'],
+    ['img/h02.jpg', 'Кладка клинкерного кирпича вблизи'],
+    ['img/h03.jpg', 'Окно и отлив, вид сбоку'],
+    ['img/h05.jpg', 'Дом на участке'],
+    ['img/h06.jpg', 'Боковой фасад'],
+    ['img/obj/kalinina/5.jpg', 'Коридор после механизированной штукатурки'],
+    ['img/obj/kalinina/6.jpg', 'Внутренние перегородки из газоблока'],
+    ['img/h07.jpg', 'Кухня-гостиная после штукатурки'],
+    ['img/h08.jpg', 'Стена под отделку, выведены розетки'],
+    ['img/h09.jpg', 'Коридор и проёмы'],
+    ['img/h10.jpg', 'Спальня, окно на участок'],
+    ['img/h11.jpg', 'Спальня после механизированной штукатурки'],
+    ['img/h12.jpg', 'Санузел, подготовка под плитку'],
+    ['img/h13.jpg', 'Котельная с закладными'],
+    ['img/h14.jpg', 'Проёмы и откосы'],
+    ['img/h15.jpg', 'Задний фасад'],
+    ['img/h16.jpg', 'Дом перед сдачей']]
+}, {
+  slug: 'slavino', title: 'Славино, дом со вторым светом', note: 'Гостиная в два света и панорамное остекление',
+  facts: [['Особенность', 'второй свет'], ['Окна', 'панорамные'], ['Стены', 'газоблок + кирпич']],
+  photos: [
+    ['img/obj/slavino/1.jpg', 'Фасад со стороны улицы'],
+    ['img/obj/slavino/2.jpg', 'Угол дома, кирпич и тёмная кровля'],
+    ['img/obj/slavino/3.jpg', 'Фасад с навесом'],
+    ['img/obj/slavino/4.jpg', 'Гостиная со вторым светом'],
+    ['img/obj/slavino/5.jpg', 'Панорамные окна гостиной'],
+    ['img/obj/slavino/6.jpg', 'Стропильная система второго света']]
+}, {
+  slug: 'terrasa', title: 'Славино, дом с террасой', note: 'Одноэтажный дом с террасой на колоннах',
+  facts: [['Особенность', 'терраса на колоннах'], ['Фасад', 'красный кирпич']],
+  photos: [
+    ['img/obj/terrasa/1.jpg', 'Фасад с террасой'],
+    ['img/obj/terrasa/2.jpg', 'Терраса и вход'],
+    ['img/obj/terrasa/3.jpg', 'Угол дома'],
+    ['img/obj/terrasa/4.jpg', 'Боковой фасад'],
+    ['img/obj/terrasa/5.jpg', 'Вид с участка'],
+    ['img/obj/terrasa/6.jpg', 'Дом со стороны въезда']]
+}, {
+  slug: 'yubileyn', title: 'Юбилейная', note: 'Двухэтажный дом из красного кирпича',
+  facts: [['Этажей', '2'], ['Фасад', 'красный кирпич'], ['Окна', 'панорамные в гостиной']],
+  photos: [
+    ['img/obj/yubileyn/1.jpg', 'Главный фасад'],
+    ['img/obj/yubileyn/2.jpg', 'Угол дома и кровля'],
+    ['img/obj/yubileyn/3.jpg', 'Боковой фасад'],
+    ['img/obj/yubileyn/4.jpg', 'Вид со двора'],
+    ['img/obj/yubileyn/5.jpg', 'Дом среди деревьев'],
+    ['img/obj/yubileyn/6.jpg', 'Панорамное окно гостиной изнутри']]
+}, {
+  slug: 'malyy', title: 'Квартал Малый 2', note: 'Одноэтажный дом в сером кирпиче',
+  facts: [['Фасад', 'серый кирпич'], ['Крыша', 'четырёхскатная']],
+  photos: [
+    ['img/obj/malyy/1.jpg', 'Фасад с крыльцом'],
+    ['img/obj/malyy/2.jpg', 'Вид с участка'],
+    ['img/obj/malyy/3.jpg', 'Боковой фасад'],
+    ['img/obj/malyy/4.jpg', 'Главный вход'],
+    ['img/obj/malyy/5.jpg', 'Комната: радиатор и разводка'],
+    ['img/obj/malyy/6.jpg', 'Коридор после штукатурки']]
+}, {
+  slug: 'selskaya', title: 'Реконструктор, по Сельской', note: 'Красный кирпич и колонны крыльца',
+  facts: [['Фасад', 'красный кирпич'], ['Крыльцо', 'на колоннах']],
+  photos: [
+    ['img/obj/selskaya/1.jpg', 'Фасад со стороны сада'],
+    ['img/obj/selskaya/2.jpg', 'Главный фасад с колоннами'],
+    ['img/obj/selskaya/3.jpg', 'Вид с участка'],
+    ['img/obj/selskaya/4.jpg', 'Кладка вблизи'],
+    ['img/obj/selskaya/5.jpg', 'Колонна крыльца']]
+}, {
+  slug: 'zemnaya', title: 'Земная 9, каркасный дом', note: 'Каркасный дом с отделкой и инженерией',
+  facts: [['Технология', 'каркас'], ['Внутри', 'отопление и электрика']],
+  photos: [
+    ['img/obj/zemnaya/1.jpg', 'Фасад каркасного дома'],
+    ['img/obj/zemnaya/2.jpg', 'Угол дома'],
+    ['img/obj/zemnaya/3.jpg', 'Крыльцо и вход'],
+    ['img/obj/zemnaya/4.jpg', 'Комната под отделку'],
+    ['img/obj/zemnaya/5.jpg', 'Ванная комната'],
+    ['img/obj/zemnaya/6.jpg', 'Котельная: котёл и коллектор']]
+}];
+
+function objectBySlug(slug) {
+  for (var i = 0; i < OBJECTS.length; i++) if (OBJECTS[i].slug === slug) return OBJECTS[i];
+  return null;
+}
+function thumbOf(src) { return src.replace(/(\d+)\.jpg$/, '$1s.jpg'); }
 
 var SERVICES = [
   ['Разработка проектов', 'Планировка, стиль, материалы. Архитекторы и инженеры ведут проект от эскиза до сдачи в строительство, помогаем с документами и разрешениями.', null],
@@ -717,14 +821,14 @@ function openProject(p) {
   $('#mStep').textContent = dec(p.area, 2) + ' м²';
   var body = $('#mBody'); body.innerHTML = '';
 
+  var shots = p.photos.map(function (src) { return [src, p.title]; })
+    .concat(p.plans.map(function (pl) { return [pl[0], pl[1] + ' · ' + p.title]; }));
   var gal = el('div', 'card-ph');
-  p.photos.concat([p.plan]).forEach(function (src, i) {
+  shots.forEach(function (item, i) {
     var b = el('button'); b.type = 'button';
-    b.innerHTML = '<img src="' + src + '" alt="" loading="lazy">';
-    b.addEventListener('click', function () {
-      openLightbox(p.photos.map(function (s) { return [s, p.title]; })
-        .concat([[p.plan, 'Планировка · ' + p.title]]), i);
-    });
+    b.setAttribute('aria-label', item[1]);
+    b.innerHTML = '<img src="' + thumbOf(item[0]) + '" alt="" loading="lazy">';
+    b.addEventListener('click', function () { openLightbox(shots, i); });
     gal.appendChild(b);
   });
   body.appendChild(gal);
@@ -745,24 +849,36 @@ function openProject(p) {
   var foot = $('#mFoot'); foot.innerHTML = '';
   var want = el('button', 'btn', 'Хочу такой дом');
   want.addEventListener('click', function () { openLead('Строительство по проекту «' + p.title + '»'); });
-  var photos = el('button', 'btn ghost', 'Фото построенного дома');
-  photos.addEventListener('click', function () { closeModal(); openLightbox(BUILT, 0); });
   foot.appendChild(want);
-  if (p.built) foot.appendChild(photos);
+  var house = p.built ? objectBySlug(p.built) : null;
+  if (house) {
+    var photos = el('button', 'btn ghost', 'Фото построенного дома');
+    photos.addEventListener('click', function () { closeModal(); openLightbox(house.photos, 0); });
+    foot.appendChild(photos);
+  }
   lastCalc = { title: p.title, rows: [['Площадь', dec(p.area, 2) + ' м²'],
     ['Стройвариант', money(p.area * S.price_base)], ['Под ключ', money(p.area * S.price_turnkey)]] };
   openModal();
 }
 
 // ── построенный дом ──────────────────────────────────────────────────
-function paintGallery() {
-  var g = $('#gal'); g.innerHTML = '';
-  BUILT.slice(0, 7).forEach(function (item, i) {
-    var b = el('button'); b.type = 'button';
-    b.setAttribute('aria-label', item[1]);
-    b.innerHTML = '<img src="' + item[0] + '" alt="' + item[1] + '" loading="lazy">';
-    b.addEventListener('click', function () { openLightbox(BUILT, i); });
-    g.appendChild(b);
+function paintObjects() {
+  var grid = $('#objGrid'); grid.innerHTML = '';
+  OBJECTS.forEach(function (o) {
+    var card = el('button', 'pcard');
+    card.type = 'button';
+    card.innerHTML =
+      '<span class="ph"><img src="' + thumbOf(o.photos[0][0]) + '" alt="' + o.title + '" loading="lazy"></span>' +
+      '<span class="in">' +
+        '<h3>' + o.title + '</h3>' +
+        '<span class="lede" style="font-size:13.5px">' + o.note + '</span>' +
+        '<span class="tags">' + o.facts.map(function (f) {
+            return '<span class="tag">' + f[0] + ': ' + f[1] + '</span>'; }).join('') + '</span>' +
+        '<span class="price-row"><span class="k">' + o.photos.length + ' фото</span>' +
+        '<span class="k">смотреть →</span></span>' +
+      '</span>';
+    card.addEventListener('click', function () { openLightbox(o.photos, 0); });
+    grid.appendChild(card);
   });
 }
 
@@ -1173,7 +1289,6 @@ $('#toMort').addEventListener('click', function () {
   var cur = TIERS.filter(function (t) { return t.k === tier; })[0];
   openCalc('mortgage', { price: Math.round(cur.p * area) });
 });
-$('#allPhotos').addEventListener('click', function () { openLightbox(BUILT, 0); });
 $('#landGo').addEventListener('click', function () {
   openLead('Подбор участка: ' + landPlace + ', бюджет ' + landBudget);
 });
@@ -1200,7 +1315,7 @@ document.addEventListener('keydown', function (e) {
 
 paintHouse();
 paintProjects();
-paintGallery();
+paintObjects();
 paintTiles();
 paintMemo();
 paintPrograms();

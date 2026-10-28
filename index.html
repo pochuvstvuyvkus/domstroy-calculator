@@ -16,7 +16,7 @@
 <meta property="og:description" content="Стоимость дома, проекты с планировками, построенные объекты и калькуляторы материалов.">
 <meta property="og:image" content="https://pochuvstvuyvkus.github.io/domstroy-calculator/img/h01.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -122,24 +122,13 @@
       <div class="sec-head">
         <div class="t">
           <p class="eyebrow">Наши дома</p>
-          <h2>Построено по этому проекту</h2>
+          <h2>Что уже построили</h2>
+          <p class="lede">Дома в Аксае, Реконструкторе, Славино и на Юбилейной: фасады, кладка
+            и внутренние работы. Нажмите на дом — откроются все фотографии.</p>
         </div>
         <button class="btn ghost" data-lead="Строительство дома, пример из портфолио">Хочу такой же</button>
       </div>
-      <div class="built">
-        <div>
-          <p class="lede">Одноэтажный дом 92,35 м² в тёмном кирпиче: четырёхскатная крыша из металлочерепицы,
-            окна в белом обрамлении, внутри — механизированная штукатурка под отделку.</p>
-          <div class="facts-list">
-            <div><span>Площадь</span><b>92,35 м²</b></div>
-            <div><span>Срок строительства</span><b>6 месяцев</b></div>
-            <div><span>Стены</span><b>газоблок + кирпич</b></div>
-            <div><span>Крыша</span><b>четырёхскатная</b></div>
-          </div>
-          <button class="btn ghost" id="allPhotos">Смотреть все фото</button>
-        </div>
-        <div class="gal" id="gal"></div>
-      </div>
+      <div class="grid-3" id="objGrid"></div>
     </div>
   </section>
 
@@ -267,6 +256,6 @@
   </footer>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
