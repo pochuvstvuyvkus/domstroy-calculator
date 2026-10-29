@@ -76,8 +76,8 @@ var PROJECTS = [
     id: 'p92', title: 'Одноэтажный дом 92,35 м²', area: 92.35,
     rooms: '3 спальни · кухня-гостиная 31,9 м² · санузел · котельная',
     descr: 'Кухня-гостиная с выходом на участок, три спальни, раздельный санузел с ванной, котельная и гардеробная. Облицовка кирпичом, четырёхскатная крыша.',
-    photos: ['img/p1.jpg', 'img/p2.jpg', 'img/p3.jpg'],
-    plans: [['img/plan.jpg', 'Планировка']]
+    photos: ['img/proj/p92/1.jpg', 'img/proj/p92/2.jpg', 'img/proj/p92/3.jpg'],
+    plans: [['img/proj/p92/plan1.jpg', 'Планировка']]
   },
   {
     id: 'pdruzhba', title: 'Двухэтажный дом, НСТ Дружба', area: 110,
@@ -397,6 +397,11 @@ function objectBySlug(slug) {
   return null;
 }
 function thumbOf(src) { return src.replace(/(\d+)\.jpg$/, '$1s.jpg'); }
+// превью; если его нет — само фото, чтобы карточка никогда не была пустой
+function thumbImg(src, alt, eager) {
+  return '<img src="' + thumbOf(src) + '" alt="' + (alt || '') + '" loading="' + (eager ? 'eager' : 'lazy') + '" ' +
+    'onerror="this.onerror=null;this.src=\'' + src + '\'">';
+}
 
 var SERVICES = [
   ['Разработка проектов', 'Планировка, стиль, материалы. Архитекторы и инженеры ведут проект от эскиза до сдачи в строительство, помогаем с документами и разрешениями.', null],
@@ -906,17 +911,92 @@ var PLOTS = [{ v: 'yes', l: 'Есть' }, { v: 'help', l: 'Нужна помощ
 var PAYS = [{ v: 'own', l: 'Свои средства' }, { v: 'mort', l: 'Ипотека' },
             { v: 'matcap', l: 'Ипотека и маткапитал' }, { v: 'none', l: 'Пока не решил' }];
 
+var openDropdown = null;          // открытый сейчас список — закрываем при клике мимо
 function selectBox(opts, value, onChange, label) {
-  var sel = el('select', 'inp');
-  sel.setAttribute('aria-label', label);
-  opts.forEach(function (o) {
-    var op = el('option', '', o.l); op.value = o.v;
-    if (o.v === value) op.selected = true;
-    sel.appendChild(op);
+  var box = el('div', 'dd');
+  var btn = el('button', 'inp dd-btn');
+  btn.type = 'button';
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-label', label);
+  var cur = el('span', 'dd-val');
+  btn.appendChild(cur);
+  btn.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>');
+  var list = el('ul', 'dd-list');
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', label);
+  list.hidden = true;
+  var items = opts.map(function (o) {
+    var li = el('li', 'dd-opt', o.l);
+    li.setAttribute('role', 'option');
+    li.tabIndex = -1;
+    li.addEventListener('click', function () { pick(o.v); });
+    list.appendChild(li);
+    return li;
   });
-  sel.addEventListener('change', function () { onChange(sel.value); });
-  return sel;
+  box.appendChild(btn);
+  document.body.appendChild(list);     // поверх страницы: карточки с обрезкой краёв его не прячут
+
+  function index() {
+    for (var i = 0; i < opts.length; i++) if (opts[i].v === value) return i;
+    return 0;
+  }
+  function paint() {
+    cur.textContent = opts[index()].l;
+    items.forEach(function (li, i) { li.setAttribute('aria-selected', i === index() ? 'true' : 'false'); });
+  }
+  function open() {
+    if (openDropdown && openDropdown !== api) openDropdown.close(false);
+    list.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    place();
+    items[index()].focus({ preventScroll: true });
+    openDropdown = api;
+  }
+  function place() {
+    var r = btn.getBoundingClientRect();
+    list.style.left = r.left + 'px';
+    list.style.width = r.width + 'px';
+    var below = window.innerHeight - r.bottom - 12, h = list.offsetHeight;
+    // не помещается снизу — открываем вверх
+    list.style.top = (h > below && r.top - 12 > below ? r.top - 6 - h : r.bottom + 6) + 'px';
+  }
+  function close(focusBtn) {
+    list.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    if (openDropdown === api) openDropdown = null;
+    if (focusBtn) btn.focus();
+  }
+  function pick(v) {
+    var changed = v !== value;
+    value = v; paint(); close(true);
+    if (changed) onChange(v);
+  }
+  btn.addEventListener('click', function () { if (list.hidden) open(); else close(false); });
+  btn.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+  list.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); items[Math.min(items.length - 1, i + 1)].focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); items[Math.max(0, i - 1)].focus(); }
+    else if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+    else if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (i >= 0) pick(opts[i].v); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); }
+    else if (e.key === 'Tab') { close(false); }
+  });
+  var api = { box: box, list: list, close: close, place: place };
+  paint();
+  return box;
 }
+document.addEventListener('pointerdown', function (e) {
+  if (openDropdown && !openDropdown.box.contains(e.target) && !openDropdown.list.contains(e.target)) {
+    openDropdown.close(false);
+  }
+});
+window.addEventListener('resize', function () { if (openDropdown) openDropdown.close(false); });
+window.addEventListener('scroll', function () { if (openDropdown) openDropdown.place(); }, { passive: true });
 
 function setArea(v, from) {
   v = Math.min(400, Math.max(40, Math.round(v || 0)));
@@ -944,10 +1024,15 @@ function paintHouse() {
 
   var down = total * S.down_min / 100;
   var mini = $('#mini'); mini.innerHTML = '';
-  [['Срок строительства', S.build_months + ' мес.'],
-   ['Первый взнос ' + dec(S.down_min) + '%', money(down)],
-   ['Платёж по семейной, 20 лет', ru(annuity(total - down, S.rate_family, 20)) + ' ₽/мес']
-  ].forEach(function (r) {
+  // своими средствами — ипотечные строки ни к чему
+  (pay === 'own'
+    ? [['Срок строительства', S.build_months + ' мес.'],
+       ['Цена за м²', ru(cur.p) + ' ₽'],
+       ['Площадь', area + ' м²']]
+    : [['Срок строительства', S.build_months + ' мес.'],
+       ['Первый взнос ' + dec(S.down_min) + '%', money(down)],
+       ['Платёж по семейной, 20 лет', ru(annuity(total - down, S.rate_family, 20)) + ' ₽/мес']]
+  ).forEach(function (r) {
     var row = el('div', 'row');
     row.innerHTML = '<span>' + r[0] + '</span><b>' + r[1] + '</b>';
     mini.appendChild(row);
@@ -1026,7 +1111,7 @@ function openProject(p) {
   shots.forEach(function (item, i) {
     var b = el('button'); b.type = 'button';
     b.setAttribute('aria-label', item[1]);
-    b.innerHTML = '<img src="' + thumbOf(item[0]) + '" alt="" loading="lazy">';
+    b.innerHTML = thumbImg(item[0], '');
     b.addEventListener('click', function () { openLightbox(shots, i); });
     gal.appendChild(b);
   });
@@ -1067,7 +1152,7 @@ function paintObjects() {
     var card = el('button', 'pcard');
     card.type = 'button';
     card.innerHTML =
-      '<span class="ph"><img src="' + thumbOf(o.photos[0][0]) + '" alt="' + o.title + '" loading="lazy"></span>' +
+      '<span class="ph">' + thumbImg(o.photos[0][0], o.title) + '</span>' +
       '<span class="in">' +
         '<h3>' + o.title + '</h3>' +
         '<span class="lede" style="font-size:13.5px">' + o.note + '</span>' +
@@ -1085,6 +1170,16 @@ function paintObjects() {
 var lbList = [], lbIdx = 0;
 function openLightbox(list, idx) {
   lbList = list; lbIdx = idx || 0;
+  var strip = $('#lbStrip'); strip.innerHTML = '';
+  lbList.forEach(function (item, i) {
+    var b = el('button'); b.type = 'button';
+    b.setAttribute('aria-label', 'Фото ' + (i + 1) + ' из ' + lbList.length);
+    b.innerHTML = thumbImg(item[0], '', true);
+    b.addEventListener('click', function () { lbIdx = i; paintLightbox(); });
+    strip.appendChild(b);
+  });
+  strip.hidden = lbList.length < 2;
+  $('#lbPrev').hidden = $('#lbNext').hidden = lbList.length < 2;
   $('#lb').hidden = false;
   document.body.style.overflow = 'hidden';
   paintLightbox();
@@ -1092,19 +1187,46 @@ function openLightbox(list, idx) {
 }
 function paintLightbox() {
   var item = lbList[lbIdx];
-  $('#lbImg').src = item[0];
-  $('#lbImg').alt = item[1] || '';
+  var img = $('#lbImg'), stage = $('#lbStage');
+  stage.classList.add('loading');
+  img.onload = function () { stage.classList.remove('loading'); };
+  img.onerror = function () { stage.classList.remove('loading'); };
+  img.src = item[0];
+  if (img.complete && img.naturalWidth) stage.classList.remove('loading');
+  img.alt = item[1] || '';
   $('#lbCap').textContent = item[1] || '';
   $('#lbCount').textContent = (lbIdx + 1) + ' / ' + lbList.length;
+  var thumbs = $('#lbStrip').children;
+  for (var i = 0; i < thumbs.length; i++) thumbs[i].setAttribute('aria-current', i === lbIdx ? 'true' : 'false');
+  if (thumbs[lbIdx]) thumbs[lbIdx].scrollIntoView({ block: 'nearest', inline: 'center' });
+  // соседние фото грузим заранее, чтобы листалось без ожидания
+  [lbIdx + 1, lbIdx - 1].forEach(function (j) {
+    var next = lbList[(j + lbList.length) % lbList.length];
+    if (next) { var pre = new Image(); pre.src = next[0]; }
+  });
 }
 function closeLightbox() {
   $('#lb').hidden = true;
+  $('#lbImg').removeAttribute('src');
   if ($('#modal').hidden) document.body.style.overflow = '';
 }
 function stepLightbox(d) {
+  if (lbList.length < 2) return;
   lbIdx = (lbIdx + d + lbList.length) % lbList.length;
   paintLightbox();
 }
+(function swipe() {          // листание пальцем на телефоне
+  var x0 = null, y0 = 0;
+  var stage = $('#lbStage');
+  stage.addEventListener('pointerdown', function (e) { if (e.pointerType !== 'mouse') { x0 = e.clientX; y0 = e.clientY; } });
+  stage.addEventListener('pointerup', function (e) {
+    if (x0 === null) return;
+    var dx = e.clientX - x0, dy = e.clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) stepLightbox(dx < 0 ? 1 : -1);
+  });
+  stage.addEventListener('pointercancel', function () { x0 = null; });
+})();
 
 // ── модальное окно ───────────────────────────────────────────────────
 var lastFocus = null;
@@ -1317,18 +1439,26 @@ function paintServices() {
   var box = $('#srv'); box.innerHTML = '';
   SERVICES.forEach(function (s) {
     var card = el('div', 'scard');
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', s[0] + ': оставить заявку');
+    card.insertAdjacentHTML('beforeend', '<span class="go" aria-hidden="true"><svg viewBox="0 0 24 24">' +
+      '<path d="M7 17 17 7M8 7h9v9"/></svg></span>');
     card.appendChild(el('h3', '', s[0]));
     card.appendChild(el('p', '', s[1]));
-    var more = el('div', 'more');
-    var lead = el('button', 'link', 'Оставить заявку');
-    lead.addEventListener('click', function () { openLead(s[0]); });
-    more.appendChild(lead);
     if (s[2]) {
-      var calcBtn = el('button', 'link', s[2][1]);
-      calcBtn.addEventListener('click', function () { openCalc(s[2][0]); });
-      more.appendChild(calcBtn);
+      var calcBtn = el('button', 'chip');
+      calcBtn.type = 'button';
+      calcBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/>' +
+        '<path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>' + s[2][1];
+      calcBtn.addEventListener('click', function (e) { e.stopPropagation(); openCalc(s[2][0]); });
+      calcBtn.addEventListener('keydown', function (e) { e.stopPropagation(); });
+      card.appendChild(calcBtn);
     }
-    card.appendChild(more);
+    card.addEventListener('click', function () { openLead(s[0]); });
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLead(s[0]); }
+    });
     box.appendChild(card);
   });
 }
@@ -1492,6 +1622,21 @@ $('#landGo').addEventListener('click', function () {
   openLead('Подбор участка: ' + landPlace + ', бюджет ' + landBudget);
 });
 $('#lbClose').addEventListener('click', closeLightbox);
+(function theme() {
+  var btn = $('#themeBtn'), meta = document.querySelector('meta[name="theme-color"]');
+  function paint() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.setAttribute('aria-label', dark ? 'Включить светлую тему' : 'Включить тёмную тему');
+    if (meta) meta.setAttribute('content', dark ? '#0E1011' : '#F6F5F2');
+  }
+  btn.addEventListener('click', function () {
+    var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    try { localStorage.setItem('ds-theme', dark ? 'dark' : 'light'); } catch (e) { /* приватный режим */ }
+    paint();
+  });
+  paint();
+})();
 $('#lbPrev').addEventListener('click', function () { stepLightbox(-1); });
 $('#lbNext').addEventListener('click', function () { stepLightbox(1); });
 
