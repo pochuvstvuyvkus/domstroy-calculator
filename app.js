@@ -15,7 +15,10 @@ var S = {
   glue_bag: 25, hydro_kg_m2: 1.5, crosses_per_tile: 4,
   gkl_sheet_m2: 3, gkl_profile_m_m2: 3, gkl_hangers_m2: 3, gkl_screws_m2: 25,
   block_volume: 0.0469, block_glue_kg_m3: 27, brick_per_m2: 51, power_factor: 0.7,
-  laminate_pack: 2, roof_waste_hip: 15, roof_waste_simple: 10
+  laminate_pack: 2, roof_waste_hip: 15, roof_waste_simple: 10,
+  // допущения расчёта по комнатам: что подставляем, когда в комнате не указано точно
+  win_w: 1.4, win_h: 1.5, door_w: 0.9, door_h: 2.1, slope_depth: 0.2,
+  room_height: 2.7, room_ratio: 1.4, glue_floor_kg_m2: 5.5, glue_wall_kg_m2: 4.5
 };
 // Цены и ставки живут на сервере в общей базе с ботами: руководитель меняет их в кабинете,
 // и новые значения сразу видят все. Здесь — запасные, на случай если сервер не ответил.
@@ -485,7 +488,7 @@ var OPENINGS = [
   { v: '2x2', l: '2 окна и 2 двери' }, { v: '0x0', l: 'Без окон и дверей' },
   { v: 'custom', l: '✍️ Свои размеры' }
 ];
-var WIN_STD = [1.4, 1.5], DOR_STD = [0.9, 2.1], DEPTH_STD = 0.2;
+var WIN_STD = [1.4, 1.5], DOR_STD = [0.9, 2.1], DEPTH_STD = 0.2;   // берутся из настроек в syncPrices
 
 function openings(v) {
   if (v.op === 'custom') {
@@ -502,7 +505,8 @@ function roomPerimeter(v, area) {
 }
 
 // ── кровля ───────────────────────────────────────────────────────────
-// Все скаты с одним уклоном: площадь кровли = площадь в плане со свесами / cos(уклона).
+// Все скаты с одним уклоном, поэтому площадь кровли = площадь в плане со свесами / cos(уклона).
+// Это верно для любой формы дома: с выступами, Г-образного, с фронтонами.
 var ROOF_SHAPES = [{ v: 'hip', l: 'Вальмовая, 4 ската' }, { v: 'gable', l: 'Двускатная' },
                    { v: 'shed', l: 'Односкатная' }];
 var ROOF_ANGLES = [15, 20, 25, 30, 35, 40, 45].map(function (a) {
@@ -511,49 +515,82 @@ var ROOF_ANGLES = [15, 20, 25, 30, 35, 40, 45].map(function (a) {
 var ROOF_OVER = [{ v: 0.3, l: '30 см' }, { v: 0.5, l: '50 см, обычно' }, { v: 0.6, l: '60 см' }, { v: 0.7, l: '70 см' }];
 var ROOF_COVERS = [{ v: 'metal', l: 'Металлочерепица' }, { v: 'prof', l: 'Профнастил' },
                    { v: 'soft', l: 'Мягкая черепица' }];
+var ROOF_AT = [{ v: 'side', l: 'Посередине стены' }, { v: 'corner', l: 'У угла, Г-образно' }];
+var ROOF_ENDS = [{ v: 'hip', l: 'Скатом' }, { v: 'gable', l: 'Фронтоном' }];
+
+// выступы под общей крышей: эркер, тамбур, крыло дома
+function roofParts(v) {
+  if (v.shape === 'shed') return [];
+  var list = Array.isArray(v.parts) ? v.parts : (v.ext === 'side' || v.ext === 'corner'
+    ? [{ at: v.ext, wid: v.ew, dep: v.ed, end: v.shape === 'gable' ? 'gable' : 'hip' }] : []);
+  return list.map(function (p) {
+    var w = num(p.wid), d = num(p.dep);
+    return w > 0 && d > 0 ? { at: p.at === 'corner' ? 'corner' : 'side', w: w, d: d,
+      end: p.end === 'gable' ? 'gable' : 'hip' } : null;
+  }).filter(Boolean);
+}
 
 function roofCalc(v) {
   var a = num(v.len), b = num(v.wid);
   if (!(a > 0) || !(b > 0)) return { rows: [], area: 0, note: 'Укажите длину и ширину дома.' };
   var L = Math.max(a, b), W = Math.min(a, b), o = +v.over;
   var ang = +v.angle * Math.PI / 180, cos = Math.cos(ang), tan = Math.tan(ang);
-  var Lo = L + 2 * o, Wo = W + 2 * o, area = Lo * Wo / cos;
-  var ridge = 0, hips = 0, eaves, gables = 0, rise, pipes;
+  var parts = roofParts(v);
+  var Lo = L + 2 * o, Wo = W + 2 * o;
+  // план дома — прямоугольник с выступами; свес добавляет периметр × свес и 4 угла
+  var flat = L * W, per = 2 * (L + W);
+  parts.forEach(function (p) { flat += p.w * p.d; per += 2 * p.d; });
+  var area = (flat + per * o + 4 * o * o) / cos;
+  // хребет или ендова: по плану идёт по диагонали квадрата h × h и поднимается на h × tg
+  function slant(h) { return Math.sqrt(2 * h * h + Math.pow(h * tan, 2)); }
+  var ridge = 0, hips = 0, valleys = 0, eaves, gables = 0, rise;
   if (v.shape === 'hip') {
-    var half = Wo / 2;
-    ridge = Lo - Wo;
-    hips = 4 * Math.sqrt(2 * half * half + Math.pow(half * tan, 2));
-    eaves = 2 * (Lo + Wo); rise = W / 2 * tan; pipes = Math.max(4, up(eaves / 10));
+    ridge = Lo - Wo; hips = 4 * slant(Wo / 2); eaves = 2 * (Lo + Wo); rise = W / 2 * tan;
   } else if (v.shape === 'gable') {
-    ridge = Lo; eaves = 2 * Lo; rise = W / 2 * tan; gables = W * rise; pipes = Math.max(2, up(eaves / 10));
+    ridge = Lo; eaves = 2 * Lo; rise = W / 2 * tan; gables = W * rise;
   } else {
-    eaves = Lo; rise = W * tan; gables = W * rise + L * rise; pipes = Math.max(2, up(eaves / 10));
+    eaves = Lo; rise = W * tan; gables = W * rise + L * rise;
   }
-  var waste = v.shape === 'hip' ? S.roof_waste_hip : S.roof_waste_simple;
+  parts.forEach(function (p) {
+    var half = (p.w + 2 * o) / 2;
+    eaves += 2 * p.d;                                     // два боковых карниза выступа
+    if (p.end === 'hip') { ridge += p.d; hips += 2 * slant(half); }
+    else { ridge += p.d + o + p.w / 2; eaves -= p.w + 2 * o; gables += p.w * p.w / 4 * tan; }
+    // ендова от внутреннего угла до конька выступа; выступ шире дома считаем по ширине дома
+    valleys += (p.at === 'corner' ? 1 : 2) * slant((Math.min(p.w, W) + 2 * o) / 2);
+    if (p.at === 'corner' && v.shape === 'hip') hips = Math.max(0, hips - slant(Wo / 2));
+  });
+  var pipes = Math.max(v.shape === 'hip' ? 4 : 2, up(eaves / 10));
+  var waste = v.shape === 'hip' || valleys > 0 ? S.roof_waste_hip : S.roof_waste_simple;
   var cover = (ROOF_COVERS.filter(function (c) { return c.v === v.cover; })[0] || ROOF_COVERS[0]).l;
   var rows = [
-    ['Площадь кровли', dec(area) + ' м²', 'по скатам, со свесами'],
+    ['Площадь кровли', dec(area) + ' м²', 'по скатам, со свесами' + (parts.length ? ' и выступами' : '')],
     [cover, dec(area * (1 + waste / 100)) + ' м²', 'запас ' + waste + '% на подрезку']];
   if (v.cover === 'soft') {
     rows.push(['OSB-3 под мягкую кровлю', up(area * 1.05 / 3.125) + ' лист.', '1,25 × 2,5 м']);
     rows.push(['Подкладочный ковёр', up(area * 1.15 / 15) + ' рул.', 'по 15 м²']);
+    if (valleys > 0) rows.push(['Ендовный ковёр', up(valleys * 1.1 / 10) + ' рул.', dec(valleys) + ' м ендов, рулон 10 м']);
     rows.push(['Обрешётка под OSB', ru(up(area / 0.3)) + ' м', 'доска 25 × 100, шаг 30 см']);
   } else {
     var step = v.cover === 'metal' ? 0.35 : 0.5;
     rows.push(['Гидроветрозащитная мембрана', up(area * 1.15 / 75) + ' рул.', 'по 75 м², нахлёст 15%']);
     rows.push(['Обрешётка', ru(up(area / step * 1.05)) + ' м', 'доска 25 × 100, шаг ' + Math.round(step * 100) + ' см']);
     rows.push(['Саморезы кровельные', ru(up(area * (v.cover === 'metal' ? 8 : 6))) + ' шт.', '']);
+    if (valleys > 0) rows.push(['Ендова нижняя и верхняя', up(valleys / 1.9) + ' + ' + up(valleys / 1.9) + ' планок',
+      dec(valleys) + ' м, планки по 2 м']);
   }
   rows.push(['Контробрешётка', ru(up(area / 0.6)) + ' м', 'брусок 50 × 50 по стропилам']);
   if (ridge + hips > 0) {
-    rows.push([v.shape === 'hip' ? 'Конёк и хребты' : 'Конёк', up((ridge + hips) / 1.9) + ' планок',
+    rows.push([hips > 0 ? 'Конёк и хребты' : 'Конёк', up((ridge + hips) / 1.9) + ' планок',
       dec(ridge + hips) + ' м, планка 2 м']);
   }
   rows.push(['Карнизная планка', up(eaves / 1.9) + ' шт.', dec(eaves) + ' м по карнизу']);
   rows.push(['Водосток', dec(eaves) + ' м', 'желоб, ' + pipes + ' ' + plural(pipes, 'труба', 'трубы', 'труб')]);
   if (gables > 0) rows.push([v.shape === 'shed' ? 'Фронтоны и высокая стена' : 'Фронтоны', dec(gables) + ' м²', 'кладка или обшивка']);
   return { rows: rows, area: area,
-    note: 'Конёк поднимется над стенами на ' + dec(rise) + ' м. Точную раскладку листов делаем по проекту кровли.' };
+    note: 'Конёк поднимется над стенами на ' + dec(rise) + ' м.' +
+      (parts.length ? ' Выступы считаем с тем же уклоном, что и основную крышу.' : '') +
+      ' Точную раскладку листов делаем по проекту кровли.' };
 }
 
 // ── набор вопросов: один в один с ботом ──────────────────────────────
@@ -572,7 +609,7 @@ var CALCS = {
       F('wid', 'num', 'Какая ширина комнаты?', { unit: 'м', def: 3.2, max: 50, presets: [2.5, 3, 3.5, 4] }),
       F('hei', 'choice', 'Какая высота потолка?', { opts: HEIGHTS, def: 2.7 }),
       F('op', 'choice', 'Сколько в комнате окон и дверей?', { opts: OPENINGS, def: '1x1',
-        hint: 'По кнопкам берём стандартные размеры: окно 1,4 × 1,5 м, дверь 0,9 × 2,1 м' }),
+        hint: '' }),                       // текст подставляет syncPrices: размеры меняются в кабинете
       F('win', 'num', 'Сколько окон?', { unit: 'шт.', def: 1, min: 0, max: 20, int: true, presets: [0, 1, 2, 3] }),
       F('dor', 'num', 'Сколько дверей?', { unit: 'шт.', def: 1, min: 0, max: 20, int: true, presets: [0, 1, 2] }),
       F('winW', 'num', 'Ширина окна?', { unit: 'м', def: 1.4, max: 10, presets: [1.2, 1.4, 1.8] }),
@@ -934,6 +971,13 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
     F('shape', 'choice', 'Какая крыша?', { def: 'hip', opts: ROOF_SHAPES }),
     F('len', 'num', 'Длина дома по наружным стенам?', { unit: 'м', def: 12, max: 60, presets: [8, 10, 12, 15] }),
     F('wid', 'num', 'Ширина дома по наружным стенам?', { unit: 'м', def: 10, max: 60, presets: [8, 9, 10, 12] }),
+    F('ext', 'choice', 'Есть выступ под общей крышей?', { def: 'none', opts: [
+      { v: 'none', l: 'Нет, дом прямоугольный' }, { v: 'side', l: 'Выступ посередине стены' },
+      { v: 'corner', l: 'Г-образный дом' }],
+      hint: 'Эркер, тамбур или крыло дома под той же крышей. Сложную крышу удобнее считать в разделе «Весь дом по комнатам»' }),
+    F('ew', 'num', 'Какая ширина выступа вдоль стены?', { unit: 'м', def: 4, max: 60, presets: [2, 3, 4, 6],
+      hint: 'Длину и ширину дома выше указывайте без выступа' }),
+    F('ed', 'num', 'Насколько выступ выходит из стены?', { unit: 'м', def: 2, max: 60, presets: [1.5, 2, 3, 4] }),
     F('angle', 'choice', 'Какой уклон скатов?', { def: 25, opts: ROOF_ANGLES,
       hint: 'Уклон подписан на плане кровли. 47% — это 25°, как в наших проектах' }),
     F('over', 'choice', 'Какой свес кровли?', { def: 0.5, opts: ROOF_OVER }),
@@ -945,6 +989,10 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
 var CALC_ORDER = ['plan', 'room', 'ceiling', 'laminate', 'tile', 'bath', 'wallpaper', 'paint', 'plaster', 'foundation', 'roof', 'electric', 'mortgage'];
 
 function skip(id, f, v) {
+  if (id === 'roof') {
+    if (f.key === 'ext') return v.shape === 'shed';
+    if (f.key === 'ew' || f.key === 'ed') return v.shape === 'shed' || !(v.ext === 'side' || v.ext === 'corner');
+  }
   var detail = ['win', 'dor', 'winW', 'winH', 'dorW', 'dorH', 'dep'];
   if ((id === 'room' || id === 'paint') && detail.indexOf(f.key) >= 0) return v.op !== 'custom';
   if (id === 'paint') {
@@ -1808,43 +1856,65 @@ var CEILS = [{ v: 'stretch', l: 'Натяжной' }, { v: 'gkl', l: 'Гипсо
 var PLASTERS = [{ v: 0, l: 'Не штукатурим' }, { v: 10, l: 'Слой 10 мм, ровные' }, { v: 20, l: 'Слой 20 мм, перепады' },
                 { v: 30, l: 'Слой 30 мм, кривые' }];
 var PLAN_KEY = 'ds-plan', PLAN_IMG_KEY = 'ds-plan-img';
-var roomSeq = 0, planDrops = [], planImg = null, plan;
+var roomSeq = 0, planDrops = [], planImg = null, plan, plasterBox = null;
 
 function makeRoom(name, kind, area, win, dor, hei) {
   var d = ROOM_KINDS[kind] || ROOM_KINDS.dry;
   return { id: 'r' + (++roomSeq), name: name, kind: kind || 'dry', len: '', wid: '',
-    area: area === undefined ? '' : area, hei: hei || 2.7,
+    area: area === undefined ? '' : area, hei: hei || S.room_height,
     win: win === undefined ? (kind === 'wet' || kind === 'hall' ? 0 : 1) : win,
     dor: dor === undefined ? 1 : dor, floor: d[0], walls: d[1], ceil: d[2] };
 }
 function projectById(id) { return PROJECTS.filter(function (p) { return p.id === id; })[0] || null; }
-function defaultRoof() { return { on: false, shape: 'hip', len: 12, wid: 10, angle: 25, over: 0.5, cover: 'metal' }; }
+function defaultRoof() {
+  return { on: false, shape: 'hip', len: 12, wid: 10, angle: 25, over: 0.5, cover: 'metal', parts: [] };
+}
 function projectRooms(p) {
   return p.plan.map(function (r) { return makeRoom(r[0], r[1], r[2], r[3], r[4]); });
+}
+
+// Расчёт: название, комнаты, кровля. sid и ver — где он лежит на сервере, если его сохранили.
+function freshPlan() {
+  return { title: '', rooms: [], plaster: 20, src: '', roof: defaultRoof(),
+           sid: null, ver: 0, dirty: false, imgDirty: false, at: 0, by: '' };
+}
+function normalizePlan(saved) {
+  var base = freshPlan();
+  if (!saved || !Array.isArray(saved.rooms)) return base;
+  base.rooms = saved.rooms.filter(function (r) { return r && typeof r === 'object'; });
+  base.title = typeof saved.title === 'string' ? saved.title.slice(0, 120) : '';
+  base.src = saved.src || '';
+  if (saved.plaster !== undefined && isFinite(+saved.plaster)) base.plaster = +saved.plaster;
+  for (var k in saved.roof || {}) base.roof[k] = saved.roof[k];
+  if (!Array.isArray(base.roof.parts)) base.roof.parts = [];
+  ['sid', 'ver', 'dirty', 'imgDirty', 'at', 'by'].forEach(function (key) {
+    if (saved[key] !== undefined && saved[key] !== null) base[key] = saved[key];
+  });
+  base.rooms.forEach(function (r) {
+    var n = parseInt(String(r.id).slice(1), 10);
+    if (n > roomSeq) roomSeq = n;
+  });
+  base.rooms.forEach(function (r) { if (!/^r\d+$/.test(String(r.id))) r.id = 'r' + (++roomSeq); });
+  return base;
 }
 function loadPlan() {
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(PLAN_KEY) || 'null'); } catch (e) { /* приватный режим */ }
-  var base = { rooms: [], plaster: 20, src: '', roof: defaultRoof() };
-  if (saved && Array.isArray(saved.rooms)) {
-    base.rooms = saved.rooms;
-    base.src = saved.src || '';
-    if (saved.plaster !== undefined) base.plaster = +saved.plaster;
-    for (var k in saved.roof || {}) base.roof[k] = saved.roof[k];
-    base.rooms.forEach(function (r) {
-      var n = parseInt(String(r.id).slice(1), 10);
-      if (n > roomSeq) roomSeq = n;
-    });
-  } else {                                         // первый визит: показываем на примере дома 92,35 м²
-    var p = projectById('p92');
-    base.rooms = projectRooms(p);
-    base.src = p.id;
-  }
   try { planImg = localStorage.getItem(PLAN_IMG_KEY); } catch (e) { planImg = null; }
-  return base;
+  return normalizePlan(saved);      // первый визит — пустой расчёт: свой план, план клиента или проект компании
 }
 function savePlan() {
   try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (e) { /* приватный режим */ }
+}
+function storeImg() {
+  try { if (planImg) localStorage.setItem(PLAN_IMG_KEY, planImg); else localStorage.removeItem(PLAN_IMG_KEY); }
+  catch (e) { /* фото не влезло — покажем без сохранения в браузере */ }
+}
+// любое изменение расчёта: запоминаем в браузере, а сохранённый расчёт отправляем и на сервер
+function touch() {
+  if (plan.sid) plan.dirty = true;
+  savePlan();
+  if (plan.sid) scheduleSync();
 }
 
 // размеры комнаты: длина × ширина или только площадь
@@ -1853,9 +1923,10 @@ function roomGeo(r) {
   if (exact) { A = L * W; per = 2 * (L + W); }
   else {
     A = num(r.area); if (!(A > 0)) A = 0;
-    per = A > 0 ? 4.05 * Math.sqrt(A) : 0;        // как у прямоугольника 1 : 1,4
+    var k = S.room_ratio > 0 ? S.room_ratio : 1.4;  // как у прямоугольника 1 : k
+    per = A > 0 ? 2 * (1 + k) * Math.sqrt(A / k) : 0;
   }
-  var H = num(r.hei); if (!(H > 0)) H = 2.7;
+  var H = num(r.hei); if (!(H > 0)) H = S.room_height;
   var win = Math.max(0, Math.round(num(r.win)) || 0), dor = Math.max(0, Math.round(num(r.dor)) || 0);
   var holes = win * WIN_STD[0] * WIN_STD[1] + dor * DOR_STD[0] * DOR_STD[1];
   return { A: A, per: per, H: H, win: win, dor: dor, exact: exact,
@@ -1941,7 +2012,7 @@ function planGroups(t) {
   rows = [];
   var tf = t.ftile + t.ftileWet;
   if (tf + t.wtile > 0) {
-    var glue = tf * 5.5 + t.wtile * 4.5;
+    var glue = tf * S.glue_floor_kg_m2 + t.wtile * S.glue_wall_kg_m2;
     rows.push(['Плиточный клей', up(glue / S.glue_bag) + ' меш.', ru(glue) + ' кг']);
     rows.push(['Затирка', dec(Math.max(1, tf * 0.15 + t.wtile * 0.2)) + ' кг', '']);
   }
@@ -1963,7 +2034,7 @@ function optLabel(list, v) {
 }
 
 function planText(t, groups) {
-  var lines = ['Материалы по плану дома', plan.rooms.length ? t.rooms + ' ' + plural(t.rooms, 'комната', 'комнаты', 'комнат') +
+  var lines = ['Материалы по плану дома' + (plan.title.trim() ? ': ' + plan.title.trim() : ''), plan.rooms.length ? t.rooms + ' ' + plural(t.rooms, 'комната', 'комнаты', 'комнат') +
     ', пол ' + dec(t.floor) + ' м², стены ' + dec(t.walls) + ' м²' : ''];
   groups.forEach(function (g) {
     lines.push('');
@@ -1975,7 +2046,7 @@ function planText(t, groups) {
 
 function changed(full) {
   if (plan.src) { plan.src = ''; paintPlanSrc(); }
-  savePlan();
+  touch();
   if (full) paintRooms(); else paintPlanOut();
 }
 
@@ -2065,10 +2136,22 @@ function paintRooms() {
   var box = $('#rooms'); box.innerHTML = '';
   if (!plan.rooms.length) {
     var empty = el('div', 'rooms-empty');
-    empty.appendChild(el('p', '', 'Комнат пока нет. Возьмите проект компании или добавьте комнаты со своей планировки.'));
+    empty.appendChild(el('p', '', 'Комнат пока нет. Впишите комнаты со своего плана или плана клиента: название, ' +
+      'длину и ширину или сразу площадь, высоту, окна и двери. Фото плана можно держать перед глазами.'));
     var acts = el('div', 'chips');
+    var first = el('button', 'btn sm', '+ Комната');
+    first.type = 'button';
+    first.setAttribute('aria-haspopup', 'menu');
+    first.addEventListener('click', function () {
+      popMenu(first, ROOM_TYPES.map(function (t) { return { v: t, l: t[0] }; }), addRoom);
+    });
+    acts.appendChild(first);
+    var photo = el('button', 'chip', 'Фото плана');
+    photo.type = 'button';
+    photo.addEventListener('click', function () { $('#planFile').click(); });
+    acts.appendChild(photo);
     PROJECTS.filter(function (p) { return p.plan; }).forEach(function (p) {
-      var b = el('button', 'chip', 'Проект ' + dec(p.area, 2) + ' м²');
+      var b = el('button', 'chip', 'Пример: проект ' + dec(p.area, 2) + ' м²');
       b.type = 'button';
       b.addEventListener('click', function () { loadProjectPlan(p, true); });
       acts.appendChild(b);
@@ -2126,10 +2209,13 @@ function paintPlanOut() {
   });
   out.appendChild(grid);
 
-  out.appendChild(el('p', 'hint',
-    'Расчёт примерный, точное количество — после замера. ' +
-    (t.approx ? 'Где указана только площадь, периметр считаем как у прямоугольной комнаты. ' : '') +
-    'Окно 1,4 × 1,5 м, дверь 0,9 × 2,1 м. Клей — на плитку 60 × 60 на полу и 30 × 60 на стенах.'));
+  var note = el('p', 'hint', assumptions(t.approx));
+  var edit = el('button', 'link staff-only', 'Изменить в кабинете');
+  edit.type = 'button';
+  edit.addEventListener('click', function () { openCabinet('rooms'); });
+  note.appendChild(document.createTextNode(' '));
+  note.appendChild(edit);
+  out.appendChild(note);
 
   var acts = el('div', 'po-acts');
   var pr = el('button', 'btn', 'Распечатать');
@@ -2149,25 +2235,36 @@ function paintPlanOut() {
   out.appendChild(acts);
 }
 
+// пояснение под расчётом: все числа из настроек, руководитель меняет их в кабинете
+function dims(a, b) { return dec(a, 2) + ' × ' + dec(b, 2) + ' м'; }
+function assumptions(approx) {
+  return 'Расчёт примерный, точное количество — после замера. ' +
+    (approx ? 'Где указана только площадь, периметр считаем как у комнаты со сторонами 1 : ' +
+      dec(S.room_ratio, 2) + '. ' : '') +
+    'Окно ' + dims(S.win_w, S.win_h) + ', откосы ' + Math.round(S.slope_depth * 100) + ' см, дверь ' +
+    dims(S.door_w, S.door_h) + '. Клей под плитку: ' + dec(S.glue_floor_kg_m2) + ' кг/м² на полу и ' +
+    dec(S.glue_wall_kg_m2) + ' кг/м² на стенах.';
+}
+
 function loadProjectPlan(p, quiet) {
   var before = { rooms: plan.rooms, src: plan.src, roof: JSON.parse(JSON.stringify(plan.roof)) };
   plan.rooms = projectRooms(p);
   plan.src = p.id;
-  if (p.roof) { plan.roof.len = p.roof[0]; plan.roof.wid = p.roof[1]; }
-  savePlan();
+  if (p.roof) { plan.roof.len = p.roof[0]; plan.roof.wid = p.roof[1]; plan.roof.parts = []; }
+  touch();
   paintRooms(); paintPlanSrc(); paintRoof();
   $('#plan').scrollIntoView({ behavior: 'smooth' });
   if (!quiet && before.rooms.length) {
     toast('Загружен проект «' + p.title + '»', 'Вернуть мои комнаты', function () {
       plan.rooms = before.rooms; plan.src = before.src; plan.roof = before.roof;
-      savePlan(); paintRooms(); paintPlanSrc(); paintRoof();
+      touch(); paintRooms(); paintPlanSrc(); paintRoof();
     });
   }
 }
 
 function addRoom(type) {
   var last = plan.rooms[plan.rooms.length - 1];
-  var r = makeRoom(type[0], type[1], undefined, undefined, undefined, last ? num(last.hei) || 2.7 : 2.7);
+  var r = makeRoom(type[0], type[1], undefined, undefined, undefined, last ? num(last.hei) || S.room_height : S.room_height);
   plan.rooms.push(r);
   changed(true);
   var rows = document.querySelectorAll('#rooms .room:not(.head)');
@@ -2202,9 +2299,12 @@ function paintPlanRef() {
   var drop = el('button', 'chip', 'Убрать');
   drop.type = 'button';
   drop.addEventListener('click', function () {
-    planImg = null;
-    try { localStorage.removeItem(PLAN_IMG_KEY); } catch (e) { /* ignore */ }
+    var was = planImg;
+    planImg = null; storeImg(); plan.imgDirty = true; touch();
     paintPlanRef();
+    toast('Фото плана убрано', 'Вернуть', function () {
+      planImg = was; storeImg(); plan.imgDirty = true; touch(); paintPlanRef();
+    });
   });
   row.appendChild(again); row.appendChild(drop);
   tx.appendChild(row);
@@ -2223,7 +2323,7 @@ function readPlanPhoto(file) {
     ctx.drawImage(img, 0, 0, c.width, c.height);
     URL.revokeObjectURL(url);
     planImg = c.toDataURL('image/jpeg', 0.86);
-    try { localStorage.setItem(PLAN_IMG_KEY, planImg); } catch (e) { /* не влезло — покажем без сохранения */ }
+    storeImg(); plan.imgDirty = true; touch();
     paintPlanRef();
     $('#planRef').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
@@ -2242,32 +2342,378 @@ function paintRoof() {
   grid.innerHTML = '';
   grid.hidden = !on;
   if (!on) return;
-  function field(label, node) {
-    var f = el('div', 'field');
+  function field(label, node, host) {
+    var f = el(node.tagName === 'INPUT' ? 'label' : 'div', 'field');
     f.appendChild(el('span', 'fl', label));
     f.appendChild(node);
-    grid.appendChild(f);
+    (host || grid).appendChild(f);
   }
-  function dd(key, opts, label) {
-    var b = selectBox(opts, plan.roof[key], function (v) { plan.roof[key] = v; savePlan(); paintPlanOut(); }, label);
+  function dd(obj, key, opts, label, host, again) {
+    var b = selectBox(opts, obj[key], function (v) {
+      obj[key] = v; touch(); paintPlanOut();
+      if (again) setTimeout(paintRoof, 0);           // поменялась форма — показать или спрятать выступы
+    }, label);
     roofDrops.push(b);
-    field(label, b);
+    field(label.split(',')[0], b, host);
   }
-  function inp(key, label) {
+  function inp(obj, key, label, host) {
     var i = el('input', 'inp num');
     i.inputMode = 'decimal';
-    i.value = String(plan.roof[key]).replace('.', ',');
+    i.autocomplete = 'off';
+    i.value = obj[key] === '' || obj[key] === undefined ? '' : String(obj[key]).replace('.', ',');
     i.setAttribute('aria-label', label);
-    i.addEventListener('input', function () { plan.roof[key] = num(i.value) > 0 ? num(i.value) : ''; savePlan(); paintPlanOut(); });
-    field(label, i);
+    i.addEventListener('input', function () { obj[key] = num(i.value) > 0 ? num(i.value) : ''; touch(); paintPlanOut(); });
+    field(label.split(',').slice(0, 2).join(',').replace(/, выступ \d+$/, ''), i, host);
+    return i;
   }
-  dd('shape', ROOF_SHAPES, 'Форма крыши');
-  inp('len', 'Длина дома, м');
-  inp('wid', 'Ширина дома, м');
-  dd('angle', ROOF_ANGLES, 'Уклон скатов');
-  dd('over', ROOF_OVER, 'Свес');
-  dd('cover', ROOF_COVERS, 'Покрытие');
-  grid.appendChild(el('p', 'hint', 'Размеры — по наружным стенам. Уклон подписан на плане кровли: 47% — это 25°.'));
+  var r = plan.roof;
+  dd(r, 'shape', ROOF_SHAPES, 'Форма крыши', null, true);
+  inp(r, 'len', 'Длина дома, м');
+  inp(r, 'wid', 'Ширина дома, м');
+  dd(r, 'angle', ROOF_ANGLES, 'Уклон скатов');
+  dd(r, 'over', ROOF_OVER, 'Свес');
+  dd(r, 'cover', ROOF_COVERS, 'Покрытие');
+  grid.appendChild(el('p', 'hint', 'Размеры — по наружным стенам основного дома, без выступов. ' +
+    'Уклон подписан на плане кровли: 47% — это 25°.'));
+  if (r.shape === 'shed') return;
+
+  var box = el('div', 'roof-parts');
+  var head = el('div', 'rp-head');
+  head.appendChild(el('b', '', 'Выступы под общей крышей'));
+  head.appendChild(el('span', 'hint', 'Эркер, тамбур или крыло Г-образного дома. Ширина — вдоль стены дома, ' +
+    'второй размер — насколько выступ выходит из стены.'));
+  box.appendChild(head);
+  r.parts.forEach(function (p, i) {
+    var row = el('div', 'rp');
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'Выступ ' + (i + 1));
+    dd(p, 'at', ROOF_AT, 'Где, выступ ' + (i + 1), row);
+    inp(p, 'wid', 'Ширина, м, выступ ' + (i + 1), row);
+    inp(p, 'dep', 'Выступает на, м, выступ ' + (i + 1), row);
+    dd(p, 'end', ROOF_ENDS, 'Торец, выступ ' + (i + 1), row);
+    var del = el('button', 'rdel');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Убрать выступ ' + (i + 1));
+    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    del.addEventListener('click', function () {
+      var at = r.parts.indexOf(p);
+      r.parts.splice(at, 1); touch(); paintRoof(); paintPlanOut();
+      toast('Выступ убран', 'Вернуть', function () { r.parts.splice(at, 0, p); touch(); paintRoof(); paintPlanOut(); });
+    });
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+  var add = el('button', 'btn ghost sm', '+ Выступ');
+  add.type = 'button';
+  add.addEventListener('click', function () {
+    r.parts.push({ at: 'side', wid: '', dep: '', end: r.shape === 'gable' ? 'gable' : 'hip' });
+    touch(); paintRoof();
+    var rows = grid.querySelectorAll('.rp'), last = rows[rows.length - 1];
+    var first = last && last.querySelector('input');
+    if (first) first.focus();
+  });
+  box.appendChild(add);
+  grid.appendChild(box);
+}
+
+// ── расчёт целиком: новый, сохранённый на сервере, открытый с другого устройства ──
+var sync = { timer: null, busy: false, again: false, state: '', info: null };
+
+function isStaff() { return document.documentElement.classList.contains('staff'); }
+function setStaff(on) { document.documentElement.classList.toggle('staff', !!on); paintSave(); }
+
+function planData() { return { rooms: plan.rooms, plaster: plan.plaster, src: plan.src, roof: plan.roof }; }
+function planSummary() {
+  var t = planTotals();
+  var bits = [t.rooms ? t.rooms + ' ' + plural(t.rooms, 'комната', 'комнаты', 'комнат') + ', ' + dec(t.floor) + ' м²'
+    : 'без комнат'];
+  if (plan.roof.on) bits.push('кровля');
+  return bits.join(' · ');
+}
+function stamp(at, who) {
+  if (!at) return '';
+  var d = new Date(at * 1000), today = new Date().toDateString() === d.toDateString();
+  return (today ? 'сегодня ' : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' ') +
+    d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + (who ? ', ' + who : '');
+}
+function snapshotPlan() { return { plan: JSON.parse(JSON.stringify(plan)), img: planImg }; }
+function repaintPlan() {
+  $('#planTitle').value = plan.title;
+  paintPlaster(); paintRooms(); paintPlanSrc(); paintPlanRef(); paintRoof(); paintSave();
+}
+function paintPlaster() {
+  if (plasterBox) plasterBox.destroy();
+  var host = $('#plasterSel'); host.innerHTML = '';
+  plasterBox = selectBox(PLASTERS, plan.plaster, function (v) { plan.plaster = +v; touch(); paintPlanOut(); }, 'Штукатурка стен');
+  host.appendChild(plasterBox);
+}
+function switchPlan(next, img) {
+  if (plan.sid && (plan.dirty || plan.imgDirty) && !sync.busy) syncNow();   // не теряем несохранённое
+  clearTimeout(sync.timer);
+  plan = next; planImg = img; storeImg();
+  sync.state = ''; sync.info = null;
+  savePlan(); repaintPlan();
+}
+function restorePlan(snap) {
+  switchPlan(normalizePlan(snap.plan), snap.img);
+  if (plan.sid) refreshEstimate();
+}
+function newPlan() {
+  var before = snapshotPlan();
+  switchPlan(freshPlan(), null);
+  $('#plan').scrollIntoView({ behavior: 'smooth' });
+  $('#planTitle').focus({ preventScroll: true });
+  if (before.plan.rooms.length || before.plan.sid) {
+    toast('Начат новый расчёт', 'Вернуть прежний', function () { restorePlan(before); });
+  }
+}
+function copyPlan() {
+  plan.sid = null; plan.ver = 0; plan.dirty = false; plan.at = 0; plan.by = '';
+  plan.title = (plan.title.trim() || 'Расчёт') + ' (копия)';
+  sync.state = ''; savePlan(); repaintPlan();
+  toast('Это копия. Нажмите «Сохранить расчёт», чтобы сохранить её отдельно');
+}
+
+function scheduleSync(delay) {
+  clearTimeout(sync.timer);
+  if (!plan.sid) return;
+  if (sync.state === 'conflict' || sync.state === 'gone') { paintSave(); return; }
+  if (!getToken()) { sync.state = 'login'; paintSave(); return; }
+  sync.state = 'wait'; paintSave();
+  sync.timer = setTimeout(function () { syncNow(); }, delay === undefined ? 1200 : delay);
+}
+function syncNow(force) {
+  clearTimeout(sync.timer);
+  if (!plan.sid) return;
+  if (sync.busy) { sync.again = true; return; }
+  if (!plan.dirty && !plan.imgDirty && !force) { sync.state = 'ok'; paintSave(); return; }
+  var sid = plan.sid, img = plan.imgDirty;
+  var payload = { title: plan.title.trim() || 'Без названия', summary: planSummary(), data: planData(), version: plan.ver };
+  if (force) payload.force = true;
+  if (img) payload.image = planImg || null;
+  plan.dirty = false; plan.imgDirty = false;
+  sync.busy = true; sync.state = 'saving'; paintSave();
+  api('PUT', '/api/estimates/' + sid, payload).then(function (r) {
+    sync.busy = false;
+    if (plan.sid !== sid) return;                    // пока сохраняли, открыли другой расчёт
+    if (r.status === 200) {
+      plan.ver = r.data.version; plan.at = r.data.updated_at; plan.by = r.data.updated_by;
+      sync.state = 'ok'; sync.info = null;
+    } else {
+      plan.dirty = true; if (img) plan.imgDirty = true;
+      if (r.status === 409) { sync.state = 'conflict'; sync.info = r.data; }
+      else if (r.status === 404) sync.state = 'gone';
+      else if (r.status === 401) { setToken(null); setStaff(false); sync.state = 'login'; }
+      else if (r.status === 0) { sync.state = 'offline'; sync.timer = setTimeout(function () { syncNow(); }, 20000); }
+      else { sync.state = 'error'; sync.info = r.data; }
+    }
+    savePlan(); paintSave();
+    if (sync.again) { sync.again = false; if (sync.state === 'ok' && (plan.dirty || plan.imgDirty)) scheduleSync(300); }
+  });
+}
+function saveNew() {
+  var title = plan.title.trim();
+  if (!title) {
+    var ti = $('#planTitle');
+    ti.classList.add('need'); ti.focus();
+    toast('Назовите расчёт: например, фамилия клиента и площадь');
+    return;
+  }
+  if (!getToken()) { openLogin('Войдите, чтобы сохранить расчёт.', saveNew); return; }
+  sync.state = 'saving'; paintSave();
+  api('POST', '/api/estimates', { title: title, summary: planSummary(), data: planData(), image: planImg || null })
+    .then(function (r) {
+      sync.state = '';
+      if (r.status === 200) {
+        plan.sid = r.data.id; plan.ver = r.data.version; plan.at = r.data.updated_at; plan.by = r.data.updated_by;
+        plan.dirty = false; plan.imgDirty = false; sync.state = 'ok';
+        savePlan(); paintSave();
+        toast('Сохранено. Откроется на любом устройстве после входа');
+        return;
+      }
+      paintSave();
+      if (r.status === 401) {
+        setToken(null); setStaff(false);
+        openLogin('Вход истёк. Войдите, и расчёт сохранится.', saveNew);
+      } else toast(r.status ? (r.data.error || 'Не получилось сохранить') : NO_LINK);
+    });
+}
+function apiImage(path) {
+  return fetch(API + path, { headers: { Authorization: 'Bearer ' + getToken() }, cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.blob() : null; })
+    .then(function (blob) {
+      if (!blob) return null;
+      return new Promise(function (done) {
+        var fr = new FileReader();
+        fr.onload = function () { done(fr.result); };
+        fr.onerror = function () { done(null); };
+        fr.readAsDataURL(blob);
+      });
+    })
+    .catch(function () { return null; });
+}
+function estimatePlan(d) {
+  var data = d.data && typeof d.data === 'object' ? d.data : {};
+  return normalizePlan({ rooms: data.rooms, plaster: data.plaster, src: data.src, roof: data.roof,
+    title: d.title, sid: d.id, ver: d.version, at: d.updated_at, by: d.updated_by, dirty: false, imgDirty: false });
+}
+function openEstimate(id) {
+  var before = snapshotPlan();
+  api('GET', '/api/estimates/' + id).then(function (r) {
+    if (r.status === 401) {
+      setToken(null); setStaff(false);
+      openLogin('Вход истёк, войдите снова.', function () { openEstimate(id); });
+      return;
+    }
+    if (r.status !== 200) {
+      if (r.status === 404 && plan.sid === id) { sync.state = 'gone'; paintSave(); }
+      toast(r.status ? (r.data.error || 'Не получилось открыть') : NO_LINK);
+      return;
+    }
+    var d = r.data;
+    (d.has_image ? apiImage('/api/estimates/' + id + '/image') : Promise.resolve(null)).then(function (img) {
+      switchPlan(estimatePlan(d), img);
+      sync.state = 'ok'; paintSave();
+      if (!$('#modal').hidden) closeModal();
+      $('#plan').scrollIntoView({ behavior: 'smooth' });
+      var other = before.plan.rooms.length && before.plan.sid !== id && (!before.plan.sid || before.plan.dirty);
+      if (other) toast('Открыт расчёт «' + d.title + '»', 'Вернуть прежний', function () { restorePlan(before); });
+      else toast('Открыт расчёт «' + d.title + '»');
+    });
+  });
+}
+// открыли сайт или вернулись на вкладку: не поменяли ли расчёт на другом устройстве
+function refreshEstimate() {
+  if (!plan.sid || !getToken() || sync.busy) return;
+  var sid = plan.sid;
+  api('GET', '/api/estimates/' + sid).then(function (r) {
+    if (plan.sid !== sid) return;
+    if (r.status === 404) { sync.state = 'gone'; paintSave(); return; }
+    if (r.status === 401) { setToken(null); setStaff(false); return; }
+    if (r.status !== 200) return;
+    var d = r.data;
+    if (d.version === plan.ver) { if (plan.dirty || plan.imgDirty) syncNow(); return; }
+    if (plan.dirty || plan.imgDirty) { sync.state = 'conflict'; sync.info = d; paintSave(); return; }
+    (d.has_image ? apiImage('/api/estimates/' + sid + '/image') : Promise.resolve(null)).then(function (img) {
+      if (plan.sid !== sid || plan.dirty) return;
+      switchPlan(estimatePlan(d), img);
+      sync.state = 'ok'; paintSave();
+      toast('Расчёт «' + d.title + '» обновлён: его меняли на другом устройстве');
+    });
+  });
+}
+
+function paintSave() {
+  var box = $('#planSave');
+  if (!box || !plan) return;
+  box.innerHTML = '';
+  function link(text, fn) {
+    var b = el('button', 'link', text);
+    b.type = 'button';
+    b.addEventListener('click', fn);
+    box.appendChild(b);
+  }
+  function line(text, cls) { box.appendChild(el('span', 'ps-t' + (cls ? ' ' + cls : ''), text)); }
+  if (!plan.sid) {
+    var b = el('button', 'btn sm', sync.state === 'saving' ? 'Сохраняем…' : 'Сохранить расчёт');
+    b.type = 'button';
+    b.disabled = sync.state === 'saving';
+    b.addEventListener('click', saveNew);
+    box.appendChild(b);
+    line('Откроется на любом устройстве после входа');
+    return;
+  }
+  var st = sync.state || (plan.dirty || plan.imgDirty ? 'wait' : 'ok');
+  if (st === 'wait' || st === 'saving') line('Сохраняем…');
+  else if (st === 'ok') { line('Сохранено' + (plan.at ? ': ' + stamp(plan.at, plan.by) : ''), 'ok'); link('Сделать копию', copyPlan); }
+  else if (st === 'offline') { line('Нет связи. Изменения сохранятся, когда появится интернет', 'bad'); link('Повторить', function () { syncNow(); }); }
+  else if (st === 'login') {
+    line('Вход истёк: изменения пока только на этом устройстве', 'bad');
+    link('Войти', function () { openLogin('Войдите, чтобы сохранить изменения.', function () { syncNow(); }); });
+  } else if (st === 'conflict') {
+    var i = sync.info || {};
+    line('Расчёт изменили на другом устройстве' + (i.updated_at ? ': ' + stamp(i.updated_at, i.updated_by) : ''), 'bad');
+    link('Открыть их версию', function () { openEstimate(plan.sid); });
+    link('Оставить мою', function () { sync.state = ''; syncNow(true); });
+  } else if (st === 'gone') {
+    line('Расчёт удалили на другом устройстве', 'bad');
+    link('Сохранить заново', function () { plan.sid = null; plan.ver = 0; sync.state = ''; savePlan(); saveNew(); });
+  } else { line((sync.info && sync.info.error) || 'Не получилось сохранить', 'bad'); link('Повторить', function () { syncNow(); }); }
+}
+
+function openSaved() {
+  if (!getToken()) { openLogin('Войдите, чтобы открыть сохранённые расчёты.', openSaved); return; }
+  var m = cabinetShell('Сохранённые расчёты');
+  var find = el('input', 'inp');
+  find.type = 'search';
+  find.placeholder = 'Поиск по названию';
+  find.setAttribute('aria-label', 'Поиск по названию');
+  var list = el('div', 'sv-list', 'Загружаем…');
+  m.body.appendChild(find);
+  m.body.appendChild(list);
+  var add = el('button', 'btn', 'Новый расчёт');
+  add.type = 'button';
+  add.addEventListener('click', function () { closeModal(); newPlan(); });
+  var hint = el('p', 'hint', 'Расчёты общие для всех сотрудников и открываются на любом устройстве после входа.');
+  hint.style.flex = '1 1 220px';
+  m.foot.appendChild(add); m.foot.appendChild(hint);
+  openModal();
+  var items = [];
+  function paint() {
+    var q = find.value.trim().toLowerCase();
+    list.innerHTML = '';
+    var shown = items.filter(function (it) { return !q || it.title.toLowerCase().indexOf(q) >= 0; });
+    if (!shown.length) {
+      list.appendChild(el('p', 'hint', items.length ? 'Ничего не нашлось.' :
+        'Пока ничего не сохранено. Впишите комнаты, назовите расчёт и нажмите «Сохранить расчёт».'));
+      return;
+    }
+    shown.forEach(function (it) {
+      var cur = it.id === plan.sid;
+      var row = el('div', 'sv-row' + (cur ? ' cur' : ''));
+      var open = el('button', 'sv-open');
+      open.type = 'button';
+      open.appendChild(el('b', '', it.title));
+      open.appendChild(el('span', '', [it.summary, stamp(it.updated_at, it.updated_by), cur ? 'открыт сейчас' : '']
+        .filter(Boolean).join(' · ')));
+      open.addEventListener('click', function () { openEstimate(it.id); });
+      var del = el('button', 'link', 'Удалить');
+      del.type = 'button';
+      var armed = null;
+      del.addEventListener('click', function () {
+        if (!armed) {
+          del.textContent = 'Точно удалить?'; del.classList.add('bad');
+          armed = setTimeout(function () { armed = null; del.textContent = 'Удалить'; del.classList.remove('bad'); }, 4000);
+          return;
+        }
+        clearTimeout(armed); del.disabled = true;
+        api('DELETE', '/api/estimates/' + it.id).then(function (r) {
+          if (r.status === 200 || r.status === 404) {
+            items = items.filter(function (x) { return x.id !== it.id; });
+            paint();
+            if (plan.sid === it.id) {           // открытый расчёт остаётся на экране, но уже не сохранён
+              plan.sid = null; plan.ver = 0; plan.dirty = false; plan.imgDirty = false; sync.state = '';
+              savePlan(); paintSave();
+            }
+            toast('Расчёт «' + it.title + '» удалён');
+          } else {
+            del.disabled = false; armed = null; del.textContent = 'Удалить'; del.classList.remove('bad');
+            toast(r.status === 401 ? 'Вход истёк, войдите снова' : NO_LINK);
+          }
+        });
+      });
+      row.appendChild(open); row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+  find.addEventListener('input', paint);
+  api('GET', '/api/estimates').then(function (r) {
+    if (r.status === 401) { setToken(null); setStaff(false); openLogin('Вход истёк, войдите снова.', openSaved); return; }
+    if (r.status !== 200) { list.textContent = NO_LINK; return; }
+    items = r.data.items;
+    paint();
+    find.focus();
+  });
 }
 
 // ── смета на печать ──────────────────────────────────────────────────
@@ -2278,6 +2724,7 @@ function printEstimate(withHouse) {
   head.innerHTML = '<img src="img/logo.png" alt=""><div><b>ДомСтрой</b><span>' + PHONE + ' · domstroy161.ru</span></div>' +
     '<span class="pr-date">' + d.toLocaleDateString('ru-RU') + '</span>';
   p.appendChild(head);
+  if (plan.title.trim()) p.appendChild(el('p', 'pr-for', 'Расчёт: ' + plan.title.trim()));
 
   if (withHouse) {
     var cur = TIERS.filter(function (x) { return x.k === tier; })[0];
@@ -2346,10 +2793,25 @@ var ADMIN_FIELDS = [
     ['waste_bath', 'Запас на плитку в санузле', '%'], ['roof_waste_hip', 'Запас на вальмовую кровлю', '%'],
     ['roof_waste_simple', 'Запас на двускатную кровлю', '%'], ['laminate_pack', 'Ламинат в упаковке', 'м²'],
     ['paint_coverage', 'Краска: м² на 1 литр', 'м²'], ['bag_gypsum', 'Мешок штукатурки', 'кг'],
-    ['glue_bag', 'Мешок плиточного клея', 'кг']]]
+    ['glue_bag', 'Мешок плиточного клея', 'кг']]],
+  ['Расчёт по комнатам', 'Что подставляем, когда в комнате не указано точно. Это же написано в пояснении ' +
+    'под расчётом. Действует только на сайте.', [
+    ['win_w', 'Окно: ширина', 'м'], ['win_h', 'Окно: высота', 'м'], ['slope_depth', 'Глубина откосов окна', 'м'],
+    ['door_w', 'Дверь: ширина', 'м'], ['door_h', 'Дверь: высота', 'м'],
+    ['room_height', 'Высота потолка новой комнаты', 'м'],
+    ['room_ratio', 'Комната только с площадью: длина к ширине', ': 1'],
+    ['glue_floor_kg_m2', 'Клей под плитку на полу', 'кг/м²'], ['glue_wall_kg_m2', 'Клей под плитку на стенах', 'кг/м²']]]
 ];
 
 function syncPrices() {
+  WIN_STD[0] = S.win_w; WIN_STD[1] = S.win_h; DOR_STD[0] = S.door_w; DOR_STD[1] = S.door_h;
+  DEPTH_STD = S.slope_depth;
+  ['room', 'paint'].forEach(function (id) {
+    CALCS[id].fields.forEach(function (f) {
+      if (f.key === 'op') f.hint = 'По кнопкам берём стандартные размеры: окно ' + dims(S.win_w, S.win_h) +
+        ', дверь ' + dims(S.door_w, S.door_h);
+    });
+  });
   TIERS[0].p = S.price_base; TIERS[1].p = S.price_fine; TIERS[2].p = S.price_turnkey;
   PROGRAMS.forEach(function (p) { p.rate = S['rate_' + p.k]; });
   PROGRAMS[0].note = 'Лимит зависит от числа детей: ' + [1, 2, 3].map(function (k) {
@@ -2412,19 +2874,22 @@ function field(label, input) {
   return f;
 }
 
-function openCabinet() {
+function openCabinet(focus) {
+  focus = typeof focus === 'string' ? focus : '';
   if (!getToken()) { openLogin(); return; }
   api('GET', '/api/me').then(function (r) {
-    if (r.status === 200) showCabinet(r.data.login);
-    else if (r.status === 401) { setToken(null); openLogin('Вход истёк, войдите снова.'); }
+    if (r.status === 200) { setStaff(true); showCabinet(r.data.login, focus); }
+    else if (r.status === 401) { setToken(null); setStaff(false); openLogin('Вход истёк, войдите снова.'); }
     else openLogin(NO_LINK);
   });
 }
 
-function openLogin(note) {
+// after — что сделать сразу после входа (сохранить расчёт, открыть список); иначе откроется кабинет
+function openLogin(note, after) {
   var m = cabinetShell('Вход в кабинет');
   $('#modal .box').classList.remove('wide');
-  m.body.appendChild(el('p', 'hint', 'Кабинет для сотрудников компании: цены за м², ставки по ипотеке, нормы расхода.'));
+  m.body.appendChild(el('p', 'hint', 'Кабинет для сотрудников компании: цены за м², ставки по ипотеке, нормы расхода ' +
+    'и сохранённые расчёты клиентов.'));
   var form = el('form', 'fields');
   form.noValidate = true;
   var login = el('input', 'inp');
@@ -2447,7 +2912,12 @@ function openLogin(note) {
     go.disabled = true; go.textContent = 'Проверяем…';
     api('POST', '/api/login', { login: login.value.trim(), password: pass.value }).then(function (r) {
       go.disabled = false; go.textContent = 'Войти';
-      if (r.status === 200) { setToken(r.data.token); showCabinet(r.data.login); return; }
+      if (r.status === 200) {
+        setToken(r.data.token); setStaff(true);
+        if (typeof after === 'function') { closeModal(); after(); } else showCabinet(r.data.login);
+        if (plan.sid && after !== saveNew) refreshEstimate();
+        return;
+      }
       pass.value = '';
       err.hidden = false;
       if (r.status === 401) {
@@ -2463,7 +2933,7 @@ function openLogin(note) {
   login.focus();
 }
 
-function showCabinet(who) {
+function showCabinet(who, focus) {
   var m = cabinetShell('Кабинет компании', who);
   var body = m.body, foot = m.foot;
 
@@ -2475,7 +2945,7 @@ function showCabinet(who) {
   var out = el('button', 'link', 'Выйти');
   out.type = 'button';
   out.addEventListener('click', function () {
-    api('POST', '/api/logout').then(function () { setToken(null); closeModal(); toast('Вы вышли из кабинета'); });
+    api('POST', '/api/logout').then(function () { setToken(null); setStaff(false); closeModal(); toast('Вы вышли из кабинета'); });
   });
   top.appendChild(pw); top.appendChild(out);
   body.appendChild(top);
@@ -2492,11 +2962,24 @@ function showCabinet(who) {
   office.appendChild(sw);
   body.appendChild(office);
 
+  var est = el('div', 'cab-sec');
+  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>В разделе «Весь дом по комнатам» нажмите ' +
+    '«Сохранить расчёт». Сохранённые открываются на любом устройстве после входа.</small></div>';
+  var goSaved = el('button', 'btn ghost sm', 'Открыть сохранённые');
+  goSaved.type = 'button';
+  goSaved.style.justifySelf = 'start';
+  goSaved.addEventListener('click', openSaved);
+  est.appendChild(goSaved);
+  body.appendChild(est);
+
   var inputs = {};
   function shown(key, k) { return typeof S[key] === 'string' ? S[key] : String(S[key] / k).replace('.', ','); }
+  var openGroup = null;
   ADMIN_FIELDS.forEach(function (g, gi) {
-    var sec = el(gi === 2 ? 'details' : 'div', 'cab-sec');
-    var h = el(gi === 2 ? 'summary' : 'div', 'cab-h');
+    var fold = gi >= 2;                              // нормы и допущения свёрнуты, чтобы не мешали ценам
+    var sec = el(fold ? 'details' : 'div', 'cab-sec');
+    var h = el(fold ? 'summary' : 'div', 'cab-h');
+    if (fold && focus === 'rooms' && g[0] === 'Расчёт по комнатам') { sec.open = true; openGroup = sec; }
     h.innerHTML = '<b>' + g[0] + '</b><small>' + g[1] + '</small>';
     sec.appendChild(h);
     var grid = el('div', 'cab-grid');
@@ -2569,7 +3052,7 @@ function showCabinet(who) {
         closeModal();
         toast('Сохранено. Новые значения уже на сайте и в боте');
       } else if (r.status === 401) {
-        setToken(null); openLogin('Вход истёк, войдите снова. Изменения не сохранились.');
+        setToken(null); setStaff(false); openLogin('Вход истёк, войдите снова. Изменения не сохранились.');
       } else {
         err.textContent = r.status ? (r.data.error || 'Не получилось сохранить') : NO_LINK + ' Ничего не сохранилось.';
         err.hidden = false;
@@ -2581,6 +3064,7 @@ function showCabinet(who) {
   hint.textContent = 'Изменённые поля подсвечены, пока не нажмёте «Сохранить».';
   foot.appendChild(save); foot.appendChild(hint);
   if (!$('#modal').hidden) { var first = $('#mBody input'); if (first) first.focus(); } else openModal();
+  if (openGroup) { openGroup.scrollIntoView({ block: 'start' }); var fi = openGroup.querySelector('input'); if (fi) fi.focus({ preventScroll: true }); }
   loadSettings();
 }
 
@@ -2674,8 +3158,13 @@ document.addEventListener('keydown', function (e) {
 
 // дом по комнатам
 plan = loadPlan();
-$('#plasterSel').appendChild(selectBox(PLASTERS, plan.plaster, function (v) {
-  plan.plaster = +v; savePlan(); paintPlanOut(); }, 'Штукатурка стен'));
+paintPlaster();
+$('#planTitle').value = plan.title;
+$('#planTitle').addEventListener('input', function () {
+  plan.title = this.value.slice(0, 120); this.classList.remove('need'); touch();
+});
+$('#planNew').addEventListener('click', newPlan);
+$('#planSaved').addEventListener('click', openSaved);
 $('#addRoom').addEventListener('click', function () {
   popMenu(this, ROOM_TYPES.map(function (t) { return { v: t, l: t[0] }; }), addRoom);
 });
@@ -2691,12 +3180,12 @@ $('#planClear').addEventListener('click', function () {
   if (!plan.rooms.length) return;
   var before = plan.rooms, src = plan.src;
   plan.rooms = []; plan.src = '';
-  savePlan(); paintRooms(); paintPlanSrc();
+  touch(); paintRooms(); paintPlanSrc();
   toast('Список комнат очищен', 'Вернуть', function () {
-    plan.rooms = before; plan.src = src; savePlan(); paintRooms(); paintPlanSrc();
+    plan.rooms = before; plan.src = src; touch(); paintRooms(); paintPlanSrc();
   });
 });
-$('#roofOn').addEventListener('change', function () { plan.roof.on = this.checked; savePlan(); paintRoof(); paintPlanOut(); });
+$('#roofOn').addEventListener('change', function () { plan.roof.on = this.checked; touch(); paintRoof(); paintPlanOut(); });
 
 // кабинет и режим офиса
 try { if (localStorage.getItem(OFFICE_KEY) === '1') setOffice(true); } catch (e) { /* ignore */ }
@@ -2719,5 +3208,18 @@ paintRooms();
 paintPlanSrc();
 paintPlanRef();
 paintRoof();
+paintSave();
+// сотрудник уже входил на этом устройстве: показываем сохранение и сверяем открытый расчёт с сервером
+if (getToken()) {
+  setStaff(true);
+  api('GET', '/api/me').then(function (r) {
+    if (r.status === 401) { setToken(null); setStaff(false); }
+    else if (r.status === 200) refreshEstimate();
+  });
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { if (plan.sid && (plan.dirty || plan.imgDirty) && !sync.busy) syncNow(); }
+  else if (isStaff()) refreshEstimate();
+});
 if (location.hash === '#office') openCabinet();
 })();

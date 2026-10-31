@@ -66,8 +66,8 @@ button{font:inherit;color:inherit}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 
 /* ── шапка ────────────────────────────────────────────────── */
-.bar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--surface) 88%,transparent);
-  backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.bar{position:sticky;top:0;z-index:30;background:var(--surface);background:color-mix(in srgb,var(--surface) 88%,transparent);
+  -webkit-backdrop-filter:saturate(1.4) blur(12px);backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
 .bar .wrap{display:flex;align-items:center;gap:18px;min-height:70px}
 .brand{display:inline-flex;align-items:center;text-decoration:none;flex:none}
 .brand .lg{height:44px;width:auto}
@@ -287,7 +287,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bac
 .modal{position:fixed;inset:0;z-index:50;display:grid;place-items:end center}
 @media (min-width:700px){.modal{place-items:center}}
 .modal[hidden]{display:none}
-.modal .back{position:absolute;inset:0;background:rgba(10,12,13,.6);backdrop-filter:blur(3px);animation:fade .18s ease}
+.modal .back{position:absolute;inset:0;background:rgba(10,12,13,.6);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:fade .18s ease}
 .box{position:relative;width:min(640px,100%);max-height:92vh;display:flex;flex-direction:column;background:var(--surface);
   border-radius:20px 20px 0 0;box-shadow:var(--shadow);animation:up .22s cubic-bezier(.2,.8,.3,1);overflow:hidden}
 @media (min-width:700px){.box{border-radius:20px}}
@@ -447,7 +447,7 @@ textarea.inp{min-height:86px;padding:12px 14px;resize:vertical;line-height:1.5}
 .rdel svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
 .rooms-empty{display:grid;gap:12px;justify-items:start;padding:18px 6px}
 .rooms-empty p{color:var(--muted)}
-@media (max-width:1000px){
+@media (max-width:1140px){
   .rooms{padding:4px 12px}
   .room.head{display:none}
   .room{grid-template-columns:repeat(6,minmax(0,1fr)) 34px;padding:14px 0;row-gap:8px}
@@ -467,6 +467,25 @@ textarea.inp{min-height:86px;padding:12px 14px;resize:vertical;line-height:1.5}
   .plan-opt{flex-wrap:wrap}
   .plan-tools .link{margin-left:0}
 }
+/* название расчёта и сохранение на сервере */
+html:not(.staff) .staff-only{display:none!important}
+.plan-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 18px;margin-bottom:16px}
+.plan-title{display:grid;gap:6px;flex:1 1 300px;max-width:520px}
+.plan-title .inp.need{border-color:var(--bad);outline:2px solid var(--bad);outline-offset:1px}
+.plan-save{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;min-height:46px;font-size:14px}
+.ps-t{color:var(--muted)}
+.ps-t.ok{color:var(--ok)}
+.ps-t.bad{color:var(--bad)}
+.link.bad{color:var(--bad)}
+.sv-list{display:grid;align-content:start;min-height:120px}
+.sv-row{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+.sv-row:last-child{border-bottom:0}
+.sv-open{flex:1;min-width:0;display:grid;gap:3px;text-align:left;background:none;border:0;padding:12px 8px;
+  border-radius:10px;cursor:pointer;color:inherit;font:inherit}
+.sv-open:hover{background:var(--surface-2)}
+.sv-open b{font-size:15.5px;overflow-wrap:anywhere}
+.sv-open span{font-size:13.5px;color:var(--muted)}
+.sv-row.cur .sv-open b{color:var(--accent)}
 .plan-tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin-top:14px}
 .plan-opt{display:flex;align-items:center;gap:10px}
 .plan-opt .dd{min-width:220px}
@@ -488,12 +507,23 @@ textarea.inp{min-height:86px;padding:12px 14px;resize:vertical;line-height:1.5}
 .switch.big small{font-weight:400;font-size:13.5px;color:var(--muted)}
 
 .roof-box{margin-top:18px;padding:16px 18px;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg)}
-.roof-grid{display:grid;gap:12px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.roof-grid{display:grid;gap:12px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
 .roof-grid[hidden]{display:none}
 .roof-grid .field{min-width:0;grid-template-columns:minmax(0,1fr)}
 .roof-grid .hint{grid-column:1/-1}
 .roof-grid .inp{min-height:42px}
 .roof-grid .inp.num{font-family:var(--mono)}
+.roof-parts{grid-column:1/-1;display:grid;gap:12px;padding-top:14px;border-top:1px dashed var(--line-strong)}
+.rp-head{display:grid;gap:3px}
+.rp-head b{font-size:15px}
+.rp{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr)) 34px;gap:10px;align-items:end}
+.rp .rdel{margin-bottom:4px}
+.roof-parts>.btn{justify-self:start}
+@media (max-width:700px){
+  .rp{grid-template-columns:repeat(2,minmax(0,1fr)) 34px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .rp .rdel{grid-column:3;grid-row:1;align-self:end}
+  .rp>.field:first-child,.rp>.field:nth-child(4){grid-column:1/3}
+}
 
 .plan-out{margin-top:22px;display:grid;gap:16px}
 .po-stats{display:flex;flex-wrap:wrap;gap:10px}
@@ -543,6 +573,15 @@ details.cab-sec[open] summary b::after{content:" ▴"}
 
 /* ── печать сметы ─────────────────────────────────────────── */
 #print{display:none}
+/* Телефоны и планшеты: поля от 16px, иначе iPhone приближает страницу при нажатии на поле;
+   мелкие ссылки получают поле для пальца, не сдвигая вёрстку */
+@media (pointer:coarse){
+  .inp,.room .inp,.room .inp.num{font-size:16px}
+  .link{padding:12px 0;margin-top:-12px;margin-bottom:-12px}
+  .switch{padding:8px 0;margin:-8px 0}
+  .bar .tel{padding:12px 0}
+  .foot a{display:inline-block;padding:7px 0}
+}
 @media print{
   @page{margin:14mm}
   body>*:not(#print){display:none!important}
@@ -554,6 +593,7 @@ details.cab-sec[open] summary b::after{content:" ▴"}
   .pr-date{margin-left:auto}
   #print h1{font-size:18pt;margin:6px 0 10px}
   #print h2{font-size:14pt;margin:18px 0 8px}
+  #print .pr-for{font-size:13pt;font-weight:700;margin:4px 0 6px}
   #print h3{font-size:11pt;margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em}
   .pr-t{width:100%;border-collapse:collapse;page-break-inside:auto}
   .pr-t tr{page-break-inside:avoid}

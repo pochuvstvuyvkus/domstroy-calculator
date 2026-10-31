@@ -18,7 +18,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <meta property="og:description" content="Стоимость дома, проекты с планировками, построенные объекты и калькуляторы материалов.">
 <meta property="og:image" content="https://pochuvstvuyvkus.github.io/domstroy-calculator/img/obj/kalinina39/1.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -161,16 +161,27 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
         <div class="t">
           <p class="eyebrow">Расчёт по плану дома</p>
           <h2>Весь дом по комнатам</h2>
-          <p class="lede">Впишите комнаты с планировки или возьмите проект компании. Посчитаем материалы
-            на весь дом сразу: пол, стены, потолки и кровлю.</p>
+          <p class="lede">Впишите комнаты со своего плана или плана клиента, или возьмите проект компании.
+            Посчитаем материалы на весь дом сразу: пол, стены, потолки и кровлю.</p>
         </div>
         <div class="plan-bar">
+          <button class="btn ghost sm" type="button" id="planNew">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Новый расчёт</button>
           <button class="btn ghost sm" type="button" id="planProject" aria-haspopup="menu">Проект компании
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
           <button class="btn ghost sm" type="button" id="planPhoto">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Фото плана</button>
+          <button class="btn ghost sm staff-only" type="button" id="planSaved">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>Сохранённые</button>
           <input type="file" id="planFile" accept="image/*" hidden>
         </div>
+      </div>
+      <div class="plan-head">
+        <label class="plan-title">
+          <span class="fl">Название расчёта</span>
+          <input class="inp" id="planTitle" maxlength="120" autocomplete="off" placeholder="Например: Иванов, Аксай, 120 м²">
+        </label>
+        <div class="plan-save staff-only" id="planSave" aria-live="polite"></div>
       </div>
       <div class="plan-ref" id="planRef" hidden></div>
       <div class="plan-src" id="planSrc"></div>
@@ -311,6 +322,6 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="print" aria-hidden="true"></div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
