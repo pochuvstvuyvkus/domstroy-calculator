@@ -16,7 +16,7 @@ var S = {
   gkl_sheet_m2: 3, gkl_profile_m_m2: 3, gkl_hangers_m2: 3, gkl_screws_m2: 25,
   block_volume: 0.0469, block_glue_kg_m3: 27, brick_per_m2: 51, power_factor: 0.7,
   laminate_pack: 2, roof_waste_hip: 15, roof_waste_simple: 10,
-  // допущения расчёта по комнатам: что подставляем, когда в комнате не указано точно
+  // допущения расчёта по плану дома: что подставляем, когда в комнате не указано точно
   win_w: 1.4, win_h: 1.5, door_w: 0.9, door_h: 2.1, slope_depth: 0.2,
   room_height: 2.7, room_ratio: 1.4, glue_floor_kg_m2: 5.5, glue_wall_kg_m2: 4.5
 };
@@ -24,7 +24,7 @@ var S = {
 // и новые значения сразу видят все. Здесь — запасные, на случай если сервер не ответил.
 var API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   ? 'http://127.0.0.1:8091' : 'https://domstroy.138-124-231-240.nip.io';
-var CACHE_KEY = 'ds-settings', TOKEN_KEY = 'ds-token', OFFICE_KEY = 'ds-office';
+var CACHE_KEY = 'ds-settings', TOKEN_KEY = 'ds-token';
 function applySettings(o) {
   var changed = false;
   for (var k in o || {}) {
@@ -754,7 +754,8 @@ var CALCS = {
       }
       walls = Math.max(0, walls);
       var ft, wt;
-      if (v.tile === 'diff') { ft = v.ft; wt = v.wt; } else { ft = wt = v.tile; }
+      // как в боте: при «Только пол» вопрос о плитке на стены пропускается, берём размер по умолчанию
+      if (v.tile === 'diff') { ft = v.ft || '60x60'; wt = v.wt || '30x60'; } else { ft = wt = v.tile || '30x60'; }
       var waste = 1 + S.waste_bath / 100;
       var f = TILE_SIZES[ft], w = TILE_SIZES[wt];
       var fq = floor * waste, wq = walls * waste;
@@ -974,7 +975,7 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
     F('ext', 'choice', 'Есть выступ под общей крышей?', { def: 'none', opts: [
       { v: 'none', l: 'Нет, дом прямоугольный' }, { v: 'side', l: 'Выступ посередине стены' },
       { v: 'corner', l: 'Г-образный дом' }],
-      hint: 'Эркер, тамбур или крыло дома под той же крышей. Сложную крышу удобнее считать в разделе «Весь дом по комнатам»' }),
+      hint: 'Эркер, тамбур или крыло дома под той же крышей. Сложную крышу удобнее считать в разделе «Расчёт по плану дома»' }),
     F('ew', 'num', 'Какая ширина выступа вдоль стены?', { unit: 'м', def: 4, max: 60, presets: [2, 3, 4, 6],
       hint: 'Длину и ширину дома выше указывайте без выступа' }),
     F('ed', 'num', 'Насколько выступ выходит из стены?', { unit: 'м', def: 2, max: 60, presets: [1.5, 2, 3, 4] }),
@@ -985,7 +986,7 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
   ],
   calc: roofCalc };
 
-// «plan» — не пошаговый расчёт, а переход к разделу «Весь дом по комнатам»
+// «plan» — не пошаговый расчёт, а переход к разделу «Расчёт по плану дома»
 var CALC_ORDER = ['plan', 'room', 'ceiling', 'laminate', 'tile', 'bath', 'wallpaper', 'paint', 'plaster', 'foundation', 'roof', 'electric', 'mortgage'];
 
 function skip(id, f, v) {
@@ -1288,7 +1289,7 @@ function openProject(p) {
   want.addEventListener('click', function () { openLead('Строительство по проекту «' + p.title + '»'); });
   foot.appendChild(want);
   if (p.plan) {
-    var byRooms = el('button', 'btn ghost', 'Материалы по комнатам');
+    var byRooms = el('button', 'btn ghost', 'Посчитать материалы');
     byRooms.addEventListener('click', function () { closeModal(); loadProjectPlan(p); });
     foot.appendChild(byRooms);
   }
@@ -1407,7 +1408,7 @@ function closeModal() {
 function paintTiles() {
   var t = $('#tiles'); t.innerHTML = '';
   CALC_ORDER.forEach(function (id) {
-    var c = id === 'plan' ? { icon: 'plan', title: 'Весь дом по комнатам', hint: 'Материалы по планировке' } : CALCS[id];
+    var c = id === 'plan' ? { icon: 'plan', title: 'Расчёт по плану дома', hint: 'Все комнаты и кровля сразу' } : CALCS[id];
     var b = el('button', id === 'plan' ? 'tile hot' : 'tile');
     b.type = 'button';
     b.innerHTML = '<span class="ic">' + icon(c.icon) + '</span>' +
@@ -1505,13 +1506,13 @@ function openCalc(id, preset) {
 
       var row = el('div', 'numrow');
       var inp = el('input', 'inp');
-      inp.type = 'number'; inp.inputMode = 'decimal';
+      inp.type = 'text'; inp.inputMode = 'decimal'; inp.autocomplete = 'off';   // text: чтобы принимать «3,5» с запятой
       inp.placeholder = 'Своё значение' + (f.unit ? ', ' + f.unit : '');
       inp.style.flex = '1 1 160px';
       var go = el('button', 'btn ghost', 'Посчитать');
       var err = el('p', 'hint bad'); err.hidden = true;
       function submit() {
-        var n = parseFloat(String(inp.value).replace(',', '.'));
+        var n = num(inp.value);
         if (isNaN(n) || n < f.min || n > f.max) {
           err.textContent = 'Нужно число от ' + dec(f.min) + ' до ' + dec(f.max) + '.';
           err.hidden = false; inp.focus(); return;
@@ -1616,9 +1617,9 @@ function paintServices() {
       calcBtn.addEventListener('keydown', function (e) { e.stopPropagation(); });
       card.appendChild(calcBtn);
     }
-    card.addEventListener('click', function () { if (!isOffice()) openLead(s[0]); });
+    card.addEventListener('click', function () { openLead(s[0]); });
     card.addEventListener('keydown', function (e) {
-      if ((e.key === 'Enter' || e.key === ' ') && !isOffice()) { e.preventDefault(); openLead(s[0]); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLead(s[0]); }
     });
     box.appendChild(card);
   });
@@ -1667,7 +1668,6 @@ function chipRow(list, value, onPick) {
 }
 
 function openLead(service) {
-  if (isOffice()) return;              // в режиме офиса заявки не отправляем
   var box = $('#modal .box');
   box.classList.remove('wide');
   $('#mTitle').textContent = 'Заявка';
@@ -1695,6 +1695,9 @@ function openLead(service) {
   form.appendChild(field('Где находится объект', chipRow(PLACES, function () { return place; }, function (v) { place = v; })));
   form.appendChild(field('Комментарий', comment));
   form.appendChild(field('Как удобнее связаться', chipRow(WAYS, function () { return way; }, function (v) { way = v; })));
+  var hp = el('input', 'hp');                   // ловушка для спам-ботов: человек это поле не видит
+  hp.name = 'website'; hp.tabIndex = -1; hp.autocomplete = 'off'; hp.setAttribute('aria-hidden', 'true');
+  form.appendChild(hp);
   var err = el('p', 'hint bad'); err.hidden = true;
   form.appendChild(err);
   body.appendChild(form);
@@ -1730,31 +1733,65 @@ function openLead(service) {
     if (phone.value.replace(/\D/g, '').length < 10) {
       err.textContent = 'Телефон нужен с кодом — 10 или 11 цифр.'; err.hidden = false; phone.focus(); return;
     }
+    err.hidden = true;
+    send.disabled = true; send.textContent = 'Отправляем…';
+    api('POST', '/api/lead', {
+      service: service || 'Консультация', name: name.value.trim(), phone: phone.value.trim(),
+      when: when, place: place, comment: comment.value.trim(), way: way, website: hp.value,
+      calc: lastCalc ? { title: lastCalc.title, rows: lastCalc.rows } : null
+    }).then(function (r) {
+      send.disabled = false; send.textContent = 'Отправить заявку';
+      if (r.status === 200) { accepted(r.data.id); return; }
+      if (r.status === 400) { err.textContent = r.data.error || 'Проверьте имя и телефон.'; err.hidden = false; return; }
+      manual(r.status === 429 ? r.data.error : '');
+    });
+  }
+
+  function tick(title, text) {
+    body.innerHTML = ''; foot.innerHTML = '';
+    var box = el('div', 'sent');
+    box.innerHTML = '<span class="tick"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="m5 13 4 4L19 7"/></svg></span>';
+    box.appendChild(el('h3', '', title));
+    box.appendChild(el('p', 'hint', text));
+    body.appendChild(box);
+  }
+  function callBtn() {
+    var call = el('a', 'btn ghost', 'Позвонить ' + PHONE);
+    call.href = 'tel:+' + PHONE_DIGITS;
+    return call;
+  }
+
+  // заявка уже у менеджеров: в чате и в таблице
+  function accepted(id) {
+    tick('Заявка принята' + (id ? ', №' + id : ''), name.value.trim() + ', менеджер свяжется с вами в рабочее время, ' +
+      'пн–пт с 9:00 до 16:00. Если вопрос срочный, позвоните.');
+    var ok = el('button', 'btn', 'Готово');
+    ok.type = 'button';
+    ok.addEventListener('click', closeModal);
+    foot.appendChild(ok); foot.appendChild(callBtn());
+    ok.focus();
+  }
+
+  // сервер не ответил: отдаём заявку клиенту, чтобы он отправил её сам
+  function manual(why) {
     var text = compose();
-    body.innerHTML = '';
-    foot.innerHTML = '';
-    var done = el('div', 'sent');
-    done.innerHTML = '<span class="tick"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="m5 13 4 4L19 7"/></svg></span><h3>Заявка готова, ' + name.value.trim() + '</h3>' +
-      '<p class="hint">Отправьте её менеджеру одним нажатием — он ответит в рабочее время, ' +
-      'пн–пт с 9:00 до 16:00.</p>';
-    body.appendChild(done);
+    tick('Не получилось отправить автоматически', (why ? why + '. ' : '') +
+      'Отправьте заявку менеджеру одним нажатием или позвоните — ответим в рабочее время, пн–пт с 9:00 до 16:00.');
     var pre = el('p', 'note');
     pre.style.whiteSpace = 'pre-line';
     pre.textContent = text;
     body.appendChild(pre);
-
-    var tg = el('a', 'btn', 'Отправить в Telegram');
-    tg.href = BOT; tg.target = '_blank'; tg.rel = 'noopener';
-    var wa = el('a', 'btn ghost', 'Написать в WhatsApp');
+    var wa = el('a', 'btn', 'Написать в WhatsApp');
     wa.href = 'https://wa.me/' + PHONE_DIGITS + '?text=' + encodeURIComponent(text);
     wa.target = '_blank'; wa.rel = 'noopener';
-    var call = el('a', 'btn ghost', 'Позвонить ' + PHONE);
-    call.href = 'tel:+' + PHONE_DIGITS;
+    var tg = el('a', 'btn ghost', 'Написать в Telegram-бот');
+    tg.href = BOT; tg.target = '_blank'; tg.rel = 'noopener';
     var copy = el('button', 'link', 'Скопировать заявку');
+    copy.type = 'button';
     copy.addEventListener('click', function () { copyText(text, copy, 'Скопировать заявку'); });
-    foot.appendChild(tg); foot.appendChild(wa); foot.appendChild(call); foot.appendChild(copy);
-    tg.focus();
+    foot.appendChild(wa); foot.appendChild(callBtn()); foot.appendChild(tg); foot.appendChild(copy);
+    wa.focus();
   }
 
   send.addEventListener('click', submit);
@@ -1837,7 +1874,7 @@ function popMenu(anchor, items, onPick) {
   openMenu = { anchor: anchor, list: list, close: close };
 }
 
-// ── дом по комнатам ──────────────────────────────────────────────────
+// ── расчёт по плану дома: комнаты и кровля ───────────────────────────
 // Комнаты с планировки → материалы на весь дом. Список хранится в браузере посетителя.
 var ROOM_KINDS = {                 // пол, стены, потолок по умолчанию
   dry: ['laminate', 'paint', 'stretch'], hall: ['tile', 'paint', 'stretch'],
@@ -2220,7 +2257,7 @@ function paintPlanOut() {
   var acts = el('div', 'po-acts');
   var pr = el('button', 'btn', 'Распечатать');
   pr.type = 'button';
-  pr.addEventListener('click', function () { printEstimate(isOffice()); });
+  pr.addEventListener('click', function () { printEstimate(false); });
   var cp = el('button', 'btn ghost', 'Скопировать список');
   cp.type = 'button';
   cp.addEventListener('click', function () { copyText(planText(t, groups), cp, 'Скопировать список'); });
@@ -2772,12 +2809,7 @@ function prTable(rows, head) {
   return tb;
 }
 
-// ── кабинет компании: цены, ставки, режим показа ─────────────────────
-function isOffice() { return document.documentElement.classList.contains('office'); }
-function setOffice(on) {
-  document.documentElement.classList.toggle('office', !!on);
-  try { if (on) localStorage.setItem(OFFICE_KEY, '1'); else localStorage.removeItem(OFFICE_KEY); } catch (e) { /* ignore */ }
-}
+// ── кабинет компании: цены, ставки, допущения расчёта ────────────────
 
 var ADMIN_FIELDS = [
   ['Цены за м²', 'Меняются в расчёте на первом экране, в проектах и в смете.', [
@@ -2794,7 +2826,7 @@ var ADMIN_FIELDS = [
     ['roof_waste_simple', 'Запас на двускатную кровлю', '%'], ['laminate_pack', 'Ламинат в упаковке', 'м²'],
     ['paint_coverage', 'Краска: м² на 1 литр', 'м²'], ['bag_gypsum', 'Мешок штукатурки', 'кг'],
     ['glue_bag', 'Мешок плиточного клея', 'кг']]],
-  ['Расчёт по комнатам', 'Что подставляем, когда в комнате не указано точно. Это же написано в пояснении ' +
+  ['Расчёт по плану дома', 'Что подставляем, когда в комнате не указано точно. Это же написано в пояснении ' +
     'под расчётом. Действует только на сайте.', [
     ['win_w', 'Окно: ширина', 'м'], ['win_h', 'Окно: высота', 'м'], ['slope_depth', 'Глубина откосов окна', 'м'],
     ['door_w', 'Дверь: ширина', 'м'], ['door_h', 'Дверь: высота', 'м'],
@@ -2950,20 +2982,8 @@ function showCabinet(who, focus) {
   top.appendChild(pw); top.appendChild(out);
   body.appendChild(top);
 
-  var office = el('div', 'cab-sec');
-  var sw = el('label', 'switch big');
-  sw.innerHTML = '<input type="checkbox"' + (isOffice() ? ' checked' : '') + '><span aria-hidden="true"></span>' +
-    '<span><b>Режим показа в офисе</b><small>Прячет заявки и кнопки «Отправить» на этом устройстве. Включайте, ' +
-    'когда считаете вместе с клиентом или показываете сайт на экране. Вместо заявки — «Распечатать смету».</small></span>';
-  sw.querySelector('input').addEventListener('change', function () {
-    setOffice(this.checked);
-    toast(this.checked ? 'Режим офиса включён: заявки спрятаны' : 'Режим офиса выключен');
-  });
-  office.appendChild(sw);
-  body.appendChild(office);
-
   var est = el('div', 'cab-sec');
-  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>В разделе «Весь дом по комнатам» нажмите ' +
+  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>В разделе «Расчёт по плану дома» нажмите ' +
     '«Сохранить расчёт». Сохранённые открываются на любом устройстве после входа.</small></div>';
   var goSaved = el('button', 'btn ghost sm', 'Открыть сохранённые');
   goSaved.type = 'button';
@@ -2979,7 +2999,7 @@ function showCabinet(who, focus) {
     var fold = gi >= 2;                              // нормы и допущения свёрнуты, чтобы не мешали ценам
     var sec = el(fold ? 'details' : 'div', 'cab-sec');
     var h = el(fold ? 'summary' : 'div', 'cab-h');
-    if (fold && focus === 'rooms' && g[0] === 'Расчёт по комнатам') { sec.open = true; openGroup = sec; }
+    if (fold && focus === 'rooms' && g[0] === 'Расчёт по плану дома') { sec.open = true; openGroup = sec; }
     h.innerHTML = '<b>' + g[0] + '</b><small>' + g[1] + '</small>';
     sec.appendChild(h);
     var grid = el('div', 'cab-grid');
@@ -3156,7 +3176,7 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && !$('#modal').hidden) closeModal();
 });
 
-// дом по комнатам
+// расчёт по плану дома
 plan = loadPlan();
 paintPlaster();
 $('#planTitle').value = plan.title;
@@ -3187,11 +3207,9 @@ $('#planClear').addEventListener('click', function () {
 });
 $('#roofOn').addEventListener('change', function () { plan.roof.on = this.checked; touch(); paintRoof(); paintPlanOut(); });
 
-// кабинет и режим офиса
-try { if (localStorage.getItem(OFFICE_KEY) === '1') setOffice(true); } catch (e) { /* ignore */ }
+// кабинет компании; режим показа в офисе убран — чистим его след на устройствах, где он был включён
+try { localStorage.removeItem('ds-office'); } catch (e) { /* ignore */ }
 $('#officeLink').addEventListener('click', function (e) { e.preventDefault(); openCabinet(); });
-$('#officePill').addEventListener('click', openCabinet);
-$('#printHouse').addEventListener('click', function () { printEstimate(true); });
 window.addEventListener('hashchange', function () { if (location.hash === '#office') openCabinet(); });
 
 syncPrices();

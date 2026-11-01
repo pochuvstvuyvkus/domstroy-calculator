@@ -336,6 +336,7 @@ textarea.inp{min-height:86px;padding:12px 14px;resize:vertical;line-height:1.5}
 
 /* ── просмотр фотографий ──────────────────────────────────── */
 .lb{position:fixed;inset:0;z-index:60;background:#0B0C0D;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-columns:minmax(0,1fr);   /* длинная подпись не распирает просмотр шире экрана */
   height:100vh;height:100dvh;color:#E9EBEB}
 .lb[hidden]{display:none}
 .lb header{display:flex;align-items:center;gap:14px;padding:12px 14px 10px 18px;padding-top:max(12px,env(safe-area-inset-top,0px))}
@@ -410,7 +411,7 @@ textarea.inp{min-height:86px;padding:12px 14px;resize:vertical;line-height:1.5}
   mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center/contain no-repeat}
 .lb .nav[hidden],.lb .strip[hidden]{display:none}
 
-/* ── дом по комнатам ──────────────────────────────────────── */
+/* ── расчёт по плану дома ──────────────────────────────────────── */
 .tile.hot{border-color:var(--accent);background:var(--accent-soft)}
 .sec.alt .tile.hot{background:var(--accent-soft)}
 .tile.hot .ic{background:var(--accent);color:var(--accent-ink)}
@@ -542,21 +543,13 @@ html:not(.staff) .staff-only{display:none!important}
 /* уведомление */
 .toast{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:80;
   display:flex;align-items:center;gap:14px;max-width:calc(100% - 32px);padding:12px 16px;border-radius:14px;
-  background:var(--panel);color:var(--panel-ink);box-shadow:var(--shadow);font-size:14px;animation:up .2s ease}
+  background:var(--panel);color:var(--panel-ink);box-shadow:var(--shadow);font-size:14px;animation:up .2s ease;pointer-events:none}
+.toast button{pointer-events:auto}   /* уведомление не мешает нажимать то, что под ним, кроме своей кнопки */
 .toast[hidden]{display:none}
 .toast .link{color:var(--accent);white-space:nowrap}
 
 /* ── кабинет и режим офиса ────────────────────────────────── */
-.office-only{display:none!important}
-html.office .office-only{display:inline-flex!important}
-html.office [data-lead],html.office .lead-only{display:none!important}
-html.office .scard{cursor:default}
-html.office .scard .go{display:none}
-html.office .scard:hover{border-color:var(--line);box-shadow:none}
-.office-pill{min-height:38px;padding:0 14px;border:0;border-radius:10px;background:var(--panel);color:var(--panel-ink);
-  font-weight:600;font-size:14px;cursor:pointer;align-items:center;gap:8px;white-space:nowrap}
-.office-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
-@media (max-width:560px){html.office .bar .tel{display:none}html.office .office-pill{margin-left:auto}}
+.hp{position:absolute;left:-10000px;width:1px;height:1px;opacity:0;pointer-events:none}
 .cab-sec{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:16px}
 .cab-h{display:grid;gap:2px}
 .cab-h small,details.cab-sec summary small{font-size:13px;color:var(--muted)}
