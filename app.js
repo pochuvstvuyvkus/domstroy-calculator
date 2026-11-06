@@ -975,7 +975,8 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
     F('ext', 'choice', 'Есть выступ под общей крышей?', { def: 'none', opts: [
       { v: 'none', l: 'Нет, дом прямоугольный' }, { v: 'side', l: 'Выступ посередине стены' },
       { v: 'corner', l: 'Г-образный дом' }],
-      hint: 'Эркер, тамбур или крыло дома под той же крышей. Сложную крышу удобнее считать в разделе «Расчёт по плану дома»' }),
+      hint: 'Эркер, тамбур или крыло дома под той же крышей',
+      staffHint: 'Сложную крышу удобнее считать в разделе «Расчёт по плану дома»' }),
     F('ew', 'num', 'Какая ширина выступа вдоль стены?', { unit: 'м', def: 4, max: 60, presets: [2, 3, 4, 6],
       hint: 'Длину и ширину дома выше указывайте без выступа' }),
     F('ed', 'num', 'Насколько выступ выходит из стены?', { unit: 'м', def: 2, max: 60, presets: [1.5, 2, 3, 4] }),
@@ -1289,7 +1290,7 @@ function openProject(p) {
   want.addEventListener('click', function () { openLead('Строительство по проекту «' + p.title + '»'); });
   foot.appendChild(want);
   if (p.plan) {
-    var byRooms = el('button', 'btn ghost', 'Посчитать материалы');
+    var byRooms = el('button', 'btn ghost staff-only', 'Посчитать материалы');
     byRooms.addEventListener('click', function () { closeModal(); loadProjectPlan(p); });
     foot.appendChild(byRooms);
   }
@@ -1409,7 +1410,7 @@ function paintTiles() {
   var t = $('#tiles'); t.innerHTML = '';
   CALC_ORDER.forEach(function (id) {
     var c = id === 'plan' ? { icon: 'plan', title: 'Расчёт по плану дома', hint: 'Все комнаты и кровля сразу' } : CALCS[id];
-    var b = el('button', id === 'plan' ? 'tile hot' : 'tile');
+    var b = el('button', id === 'plan' ? 'tile hot staff-only' : 'tile');
     b.type = 'button';
     b.innerHTML = '<span class="ic">' + icon(c.icon) + '</span>' +
       '<span class="tx"><b>' + c.title + '</b><span>' + c.hint + '</span></span>';
@@ -1452,7 +1453,11 @@ function openCalc(id, preset) {
     $('#mStep').textContent = 'Вопрос ' + (pos || 1) + ' из ' + list.length;
 
     body.appendChild(el('p', 'q-title', f.q));
-    if (f.hint) body.appendChild(el('p', 'q-hint', f.hint));
+    if (f.hint) {
+      var qh = el('p', 'q-hint', f.hint);
+      if (f.staffHint) qh.appendChild(el('span', 'staff-only', '. ' + f.staffHint));
+      body.appendChild(qh);
+    }
 
     if (f.kind === 'choice') {
       var opts = el('div', 'opts');
@@ -2457,7 +2462,15 @@ function paintRoof() {
 var sync = { timer: null, busy: false, again: false, state: '', info: null };
 
 function isStaff() { return document.documentElement.classList.contains('staff'); }
-function setStaff(on) { document.documentElement.classList.toggle('staff', !!on); paintSave(); }
+function setStaff(on) { document.documentElement.classList.toggle('staff', !!on); stripeSections(); paintSave(); }
+// раздел «Расчёт по плану дома» виден только после входа: заново чередуем фон видимых разделов, чтобы соседние не сливались
+function stripeSections() {
+  var n = 0;
+  document.querySelectorAll('main > section.sec').forEach(function (s) {
+    if (getComputedStyle(s).display === 'none') return;
+    s.classList.toggle('alt', n % 2 === 1); n++;
+  });
+}
 
 function planData() { return { rooms: plan.rooms, plaster: plan.plaster, src: plan.src, roof: plan.roof }; }
 function planSummary() {
@@ -2983,13 +2996,18 @@ function showCabinet(who, focus) {
   body.appendChild(top);
 
   var est = el('div', 'cab-sec');
-  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>В разделе «Расчёт по плану дома» нажмите ' +
-    '«Сохранить расчёт». Сохранённые открываются на любом устройстве после входа.</small></div>';
+  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>Раздел «Расчёт по плану дома» виден только после входа ' +
+    'в кабинет. Нажмите там «Сохранить расчёт», сохранённые открываются на любом устройстве после входа.</small></div>';
+  var estBtns = el('div');
+  estBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+  var goPlan = el('button', 'btn sm', 'Перейти к расчёту по плану');
+  goPlan.type = 'button';
+  goPlan.addEventListener('click', function () { closeModal(); $('#plan').scrollIntoView({ behavior: 'smooth' }); });
   var goSaved = el('button', 'btn ghost sm', 'Открыть сохранённые');
   goSaved.type = 'button';
-  goSaved.style.justifySelf = 'start';
   goSaved.addEventListener('click', openSaved);
-  est.appendChild(goSaved);
+  estBtns.appendChild(goPlan); estBtns.appendChild(goSaved);
+  est.appendChild(estBtns);
   body.appendChild(est);
 
   var inputs = {};
@@ -3227,6 +3245,7 @@ paintPlanSrc();
 paintPlanRef();
 paintRoof();
 paintSave();
+stripeSections();
 // сотрудник уже входил на этом устройстве: показываем сохранение и сверяем открытый расчёт с сервером
 if (getToken()) {
   setStaff(true);
