@@ -18,7 +18,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <meta property="og:description" content="Стоимость дома, проекты с планировками, построенные объекты и калькуляторы материалов.">
 <meta property="og:image" content="https://pochuvstvuyvkus.github.io/domstroy-calculator/img/obj/kalinina39/1.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -32,7 +32,6 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
       <a href="#projects">Проекты</a>
       <a href="#built">Наши дома</a>
       <a href="#calcs">Калькуляторы</a>
-      <a href="#plan" class="staff-only">Расчёт по плану</a>
       <a href="#mortgage">Ипотека</a>
       <a href="#services">Услуги</a>
       <a href="#contacts">Контакты</a>
@@ -153,54 +152,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
     </div>
   </section>
 
-  <section class="sec alt staff-only" id="plan">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="t">
-          <p class="eyebrow">Материалы на весь дом</p>
-          <h2>Расчёт по плану дома</h2>
-          <p class="lede">Впишите комнаты со своего плана или плана клиента, или возьмите проект компании.
-            Посчитаем материалы на весь дом сразу: пол, стены, потолки и кровлю.</p>
-        </div>
-        <div class="plan-bar">
-          <button class="btn ghost sm" type="button" id="planNew">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Новый расчёт</button>
-          <button class="btn ghost sm" type="button" id="planProject" aria-haspopup="menu">Проект компании
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
-          <button class="btn ghost sm" type="button" id="planPhoto">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Фото плана</button>
-          <button class="btn ghost sm staff-only" type="button" id="planSaved">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>Сохранённые</button>
-          <input type="file" id="planFile" accept="image/*" hidden>
-        </div>
-      </div>
-      <div class="plan-head">
-        <label class="plan-title">
-          <span class="fl">Название расчёта</span>
-          <input class="inp" id="planTitle" maxlength="120" autocomplete="off" placeholder="Например: Иванов, Аксай, 120 м²">
-        </label>
-        <div class="plan-save staff-only" id="planSave" aria-live="polite"></div>
-      </div>
-      <div class="plan-ref" id="planRef" hidden></div>
-      <div class="plan-src" id="planSrc"></div>
-      <div class="rooms" id="rooms"></div>
-      <div class="plan-tools">
-        <button class="btn sm" type="button" id="addRoom" aria-haspopup="menu">+ Комната</button>
-        <div class="plan-opt">
-          <span class="fl">Штукатурка стен</span>
-          <div id="plasterSel"></div>
-        </div>
-        <button class="link" type="button" id="planClear">Очистить список</button>
-      </div>
-      <div class="roof-box" id="roofBox">
-        <label class="switch"><input type="checkbox" id="roofOn"><span aria-hidden="true"></span>Посчитать и кровлю</label>
-        <div class="roof-grid" id="roofGrid" hidden></div>
-      </div>
-      <div class="plan-out" id="planOut" aria-live="polite"></div>
-    </div>
-  </section>
-
-  <section class="sec" id="mortgage">
+  <section class="sec alt" id="mortgage">
     <div class="wrap">
       <div class="sec-head">
         <div class="t">
@@ -218,7 +170,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
     </div>
   </section>
 
-  <section class="sec alt" id="services">
+  <section class="sec" id="services">
     <div class="wrap">
       <div class="sec-head">
         <div class="t">
@@ -234,7 +186,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
     </div>
   </section>
 
-  <section class="sec lead-only">
+  <section class="sec alt lead-only">
     <div class="wrap">
       <div class="land">
         <p class="eyebrow">Подбор участка</p>
@@ -282,7 +234,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
       <p class="k">Telegram</p>
       <p><a href="https://t.me/domstroy161ru">Канал компании</a></p>
       <p><a href="https://t.me/domstroy161_bot?start=site">Бот с калькуляторами</a></p>
-      <p><a href="#office" id="officeLink">Кабинет компании</a></p>
+      <p><a href="cabinet.html" target="_blank" rel="noopener">Кабинет компании</a></p>
     </div>
     <p class="fine">Расчёты на странице примерные и не являются офертой: точное количество материалов и смету
       считает специалист после замера. Цены за м² действуют на момент расчёта.</p>
@@ -320,6 +272,6 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="print" aria-hidden="true"></div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -603,3 +603,38 @@ details.cab-sec[open] summary b::after{content:" ▴"}
 .cab-log-r .when{font-family:var(--mono);font-size:12.5px}
 .cab-log-r .what{color:var(--ink)}
 @media (max-width:560px){.cab-log-r{grid-template-columns:1fr}.cab-log-r{gap:2px}}
+
+/* ── кабинет компании: отдельная страница cabinet.html ── */
+.cab-page{background:var(--surface)}
+.cab-bar .wrap{flex-wrap:wrap;row-gap:8px;min-height:0;padding-top:12px;padding-bottom:12px}
+.cab-name{font-weight:700;font-size:15px;color:var(--muted);white-space:nowrap}
+.cab-user{display:flex;align-items:center;gap:14px;margin-left:auto;min-width:0}
+.cab-user .who{font-family:var(--mono);font-size:13.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:18ch}
+.cab-user[hidden],.cab-login[hidden]{display:none}
+.cab-user[hidden]+.theme-btn{margin-left:auto}
+.cab-tabs{flex:1 0 100%;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-bottom:-4px}
+.cab-tabs[hidden]{display:none}
+.cab-tabs::-webkit-scrollbar{display:none}
+.cab-tabs a{flex:none;padding:8px 14px;border-radius:10px;font-size:14.5px;font-weight:600;color:var(--muted);text-decoration:none;white-space:nowrap}
+.cab-tabs a:hover{background:var(--surface-2);color:var(--ink)}
+.cab-tabs a[aria-current="page"]{background:var(--accent-soft);color:var(--ink)}
+@media (max-width:640px){.cab-user .who{display:none}}
+@media (max-width:420px){.cab-name{display:none}}
+.cab-view{padding:clamp(24px,4vw,42px) 0 clamp(40px,6vw,72px);scroll-margin-top:100vh}
+.cab-view[hidden]{display:none}
+.cab-login{min-height:calc(100vh - 70px);min-height:calc(100dvh - 70px);display:grid;place-items:center;padding:28px 18px}
+.cab-card{width:min(420px,100%);display:grid;gap:16px;padding:clamp(22px,4vw,32px);background:var(--bg);border:1px solid var(--line);border-radius:20px}
+.cab-card h1{font-size:26px;line-height:1.2;margin:0}
+.cab-card .link{justify-self:start}
+#settingsBox{display:grid;gap:14px}
+.cab-page .cab-sec{background:var(--bg);scroll-margin-top:140px}
+.cab-savebar{position:sticky;bottom:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;
+  padding:14px 0 max(14px,env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
+.cab-savebar .hint{flex:1 1 220px}
+.cab-savebar .hint.bad{flex-basis:100%;order:3}
+.cab-savebar.on .hint:not(.bad){color:var(--accent);font-weight:600}
+.sv-tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.sv-tools .inp{flex:1 1 240px;width:auto}
+#savedBox .sv-list{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:4px 10px}
+#journalBox{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:6px 16px;min-height:60px}
+#passwordBox{max-width:420px}

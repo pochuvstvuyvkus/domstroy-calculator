@@ -25,6 +25,8 @@ var S = {
 var API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   ? 'http://127.0.0.1:8091' : 'https://domstroy.138-124-231-240.nip.io';
 var CACHE_KEY = 'ds-settings', TOKEN_KEY = 'ds-token';
+// одна и та же программа работает на сайте (index.html) и в кабинете компании (cabinet.html)
+var CAB = document.body.getAttribute('data-page') === 'cabinet';
 function applySettings(o) {
   var changed = false;
   for (var k in o || {}) {
@@ -975,8 +977,7 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
     F('ext', 'choice', 'Есть выступ под общей крышей?', { def: 'none', opts: [
       { v: 'none', l: 'Нет, дом прямоугольный' }, { v: 'side', l: 'Выступ посередине стены' },
       { v: 'corner', l: 'Г-образный дом' }],
-      hint: 'Эркер, тамбур или крыло дома под той же крышей',
-      staffHint: 'Сложную крышу удобнее считать в разделе «Расчёт по плану дома»' }),
+      hint: 'Эркер, тамбур или крыло дома под той же крышей' }),
     F('ew', 'num', 'Какая ширина выступа вдоль стены?', { unit: 'м', def: 4, max: 60, presets: [2, 3, 4, 6],
       hint: 'Длину и ширину дома выше указывайте без выступа' }),
     F('ed', 'num', 'Насколько выступ выходит из стены?', { unit: 'м', def: 2, max: 60, presets: [1.5, 2, 3, 4] }),
@@ -987,8 +988,7 @@ CALCS.roof = { icon: 'roof', title: 'Кровля', hint: 'Покрытие, м�
   ],
   calc: roofCalc };
 
-// «plan» — не пошаговый расчёт, а переход к разделу «Расчёт по плану дома»
-var CALC_ORDER = ['plan', 'room', 'ceiling', 'laminate', 'tile', 'bath', 'wallpaper', 'paint', 'plaster', 'foundation', 'roof', 'electric', 'mortgage'];
+var CALC_ORDER = ['room', 'ceiling', 'laminate', 'tile', 'bath', 'wallpaper', 'paint', 'plaster', 'foundation', 'roof', 'electric', 'mortgage'];
 
 function skip(id, f, v) {
   if (id === 'roof') {
@@ -1289,11 +1289,6 @@ function openProject(p) {
   var want = el('button', 'btn lead-only', 'Хочу такой дом');
   want.addEventListener('click', function () { openLead('Строительство по проекту «' + p.title + '»'); });
   foot.appendChild(want);
-  if (p.plan) {
-    var byRooms = el('button', 'btn ghost staff-only', 'Посчитать материалы');
-    byRooms.addEventListener('click', function () { closeModal(); loadProjectPlan(p); });
-    foot.appendChild(byRooms);
-  }
   var house = p.built ? objectBySlug(p.built) : null;
   if (house) {
     var photos = el('button', 'btn ghost', 'Фото построенного дома');
@@ -1409,15 +1404,12 @@ function closeModal() {
 function paintTiles() {
   var t = $('#tiles'); t.innerHTML = '';
   CALC_ORDER.forEach(function (id) {
-    var c = id === 'plan' ? { icon: 'plan', title: 'Расчёт по плану дома', hint: 'Все комнаты и кровля сразу' } : CALCS[id];
-    var b = el('button', id === 'plan' ? 'tile hot staff-only' : 'tile');
+    var c = CALCS[id];
+    var b = el('button', 'tile');
     b.type = 'button';
     b.innerHTML = '<span class="ic">' + icon(c.icon) + '</span>' +
       '<span class="tx"><b>' + c.title + '</b><span>' + c.hint + '</span></span>';
-    b.addEventListener('click', function () {
-      if (id === 'plan') { $('#plan').scrollIntoView({ behavior: 'smooth' }); return; }
-      openCalc(id);
-    });
+    b.addEventListener('click', function () { openCalc(id); });
     t.appendChild(b);
   });
 }
@@ -1453,11 +1445,7 @@ function openCalc(id, preset) {
     $('#mStep').textContent = 'Вопрос ' + (pos || 1) + ' из ' + list.length;
 
     body.appendChild(el('p', 'q-title', f.q));
-    if (f.hint) {
-      var qh = el('p', 'q-hint', f.hint);
-      if (f.staffHint) qh.appendChild(el('span', 'staff-only', '. ' + f.staffHint));
-      body.appendChild(qh);
-    }
+    if (f.hint) body.appendChild(el('p', 'q-hint', f.hint));
 
     if (f.kind === 'choice') {
       var opts = el('div', 'opts');
@@ -2252,9 +2240,9 @@ function paintPlanOut() {
   out.appendChild(grid);
 
   var note = el('p', 'hint', assumptions(t.approx));
-  var edit = el('button', 'link staff-only', 'Изменить в кабинете');
+  var edit = el('button', 'link', 'Изменить в настройках');
   edit.type = 'button';
-  edit.addEventListener('click', function () { openCabinet('rooms'); });
+  edit.addEventListener('click', function () { go('settings', 'rooms'); });
   note.appendChild(document.createTextNode(' '));
   note.appendChild(edit);
   out.appendChild(note);
@@ -2266,14 +2254,7 @@ function paintPlanOut() {
   var cp = el('button', 'btn ghost', 'Скопировать список');
   cp.type = 'button';
   cp.addEventListener('click', function () { copyText(planText(t, groups), cp, 'Скопировать список'); });
-  var ld = el('button', 'btn ghost lead-only', 'Отправить прорабу');
-  ld.type = 'button';
-  ld.addEventListener('click', function () {
-    lastCalc = { title: 'Материалы по плану дома', rows: [['Комнат', String(t.rooms)], ['Пол', dec(t.floor) + ' м²'],
-      ['Стены', dec(t.walls) + ' м²']].concat(roof && roof.area ? [['Кровля', dec(roof.area) + ' м²']] : []) };
-    openLead('Отделка по плану дома');
-  });
-  acts.appendChild(pr); acts.appendChild(cp); acts.appendChild(ld);
+  acts.appendChild(pr); acts.appendChild(cp);
   out.appendChild(acts);
 }
 
@@ -2295,7 +2276,7 @@ function loadProjectPlan(p, quiet) {
   if (p.roof) { plan.roof.len = p.roof[0]; plan.roof.wid = p.roof[1]; plan.roof.parts = []; }
   touch();
   paintRooms(); paintPlanSrc(); paintRoof();
-  $('#plan').scrollIntoView({ behavior: 'smooth' });
+  toPlan();
   if (!quiet && before.rooms.length) {
     toast('Загружен проект «' + p.title + '»', 'Вернуть мои комнаты', function () {
       plan.rooms = before.rooms; plan.src = before.src; plan.roof = before.roof;
@@ -2462,15 +2443,7 @@ function paintRoof() {
 var sync = { timer: null, busy: false, again: false, state: '', info: null };
 
 function isStaff() { return document.documentElement.classList.contains('staff'); }
-function setStaff(on) { document.documentElement.classList.toggle('staff', !!on); stripeSections(); paintSave(); }
-// раздел «Расчёт по плану дома» виден только после входа: заново чередуем фон видимых разделов, чтобы соседние не сливались
-function stripeSections() {
-  var n = 0;
-  document.querySelectorAll('main > section.sec').forEach(function (s) {
-    if (getComputedStyle(s).display === 'none') return;
-    s.classList.toggle('alt', n % 2 === 1); n++;
-  });
-}
+function setStaff(on) { document.documentElement.classList.toggle('staff', !!on); paintSave(); }
 
 function planData() { return { rooms: plan.rooms, plaster: plan.plaster, src: plan.src, roof: plan.roof }; }
 function planSummary() {
@@ -2511,7 +2484,7 @@ function restorePlan(snap) {
 function newPlan() {
   var before = snapshotPlan();
   switchPlan(freshPlan(), null);
-  $('#plan').scrollIntoView({ behavior: 'smooth' });
+  toPlan();
   $('#planTitle').focus({ preventScroll: true });
   if (before.plan.rooms.length || before.plan.sid) {
     toast('Начат новый расчёт', 'Вернуть прежний', function () { restorePlan(before); });
@@ -2625,7 +2598,7 @@ function openEstimate(id) {
       switchPlan(estimatePlan(d), img);
       sync.state = 'ok'; paintSave();
       if (!$('#modal').hidden) closeModal();
-      $('#plan').scrollIntoView({ behavior: 'smooth' });
+      toPlan();
       var other = before.plan.rooms.length && before.plan.sid !== id && (!before.plan.sid || before.plan.dirty);
       if (other) toast('Открыт расчёт «' + d.title + '»', 'Вернуть прежний', function () { restorePlan(before); });
       else toast('Открыт расчёт «' + d.title + '»');
@@ -2691,23 +2664,20 @@ function paintSave() {
   } else { line((sync.info && sync.info.error) || 'Не получилось сохранить', 'bad'); link('Повторить', function () { syncNow(); }); }
 }
 
-function openSaved() {
-  if (!getToken()) { openLogin('Войдите, чтобы открыть сохранённые расчёты.', openSaved); return; }
-  var m = cabinetShell('Сохранённые расчёты');
+function openSaved() { go('saved'); }
+function renderSaved() {
+  var box = $('#savedBox'); box.innerHTML = '';
+  var tools = el('div', 'sv-tools');
   var find = el('input', 'inp');
   find.type = 'search';
   find.placeholder = 'Поиск по названию';
   find.setAttribute('aria-label', 'Поиск по названию');
-  var list = el('div', 'sv-list', 'Загружаем…');
-  m.body.appendChild(find);
-  m.body.appendChild(list);
   var add = el('button', 'btn', 'Новый расчёт');
   add.type = 'button';
-  add.addEventListener('click', function () { closeModal(); newPlan(); });
-  var hint = el('p', 'hint', 'Расчёты общие для всех сотрудников и открываются на любом устройстве после входа.');
-  hint.style.flex = '1 1 220px';
-  m.foot.appendChild(add); m.foot.appendChild(hint);
-  openModal();
+  add.addEventListener('click', newPlan);
+  tools.appendChild(find); tools.appendChild(add);
+  var list = el('div', 'sv-list', 'Загружаем…');
+  box.appendChild(tools); box.appendChild(list);
   var items = [];
   function paint() {
     var q = find.value.trim().toLowerCase();
@@ -2762,7 +2732,6 @@ function openSaved() {
     if (r.status !== 200) { list.textContent = NO_LINK; return; }
     items = r.data.items;
     paint();
-    find.focus();
   });
 }
 
@@ -2867,14 +2836,16 @@ function syncPrices() {
     { v: 1, l: '1 ребёнок, до ' + dec(S.limit_kids_1 / 1e6) + ' млн ₽' },
     { v: 2, l: '2 детей, до ' + dec(S.limit_kids_2 / 1e6) + ' млн ₽' },
     { v: 3, l: '3 и больше, до ' + dec(S.limit_kids_3 / 1e6) + ' млн ₽' }];
+  if (CAB) return;
   $('#factPrice').textContent = ru(S.price_base) + ' ₽/м²';
   $('#factMonths').textContent = S.build_months + ' ' + plural(parseInt(String(S.build_months).split(/[–-]/).pop(), 10) || 5,
     'месяц', 'месяца', 'месяцев');
 }
 function repaintPrices() {
   syncPrices();
+  if (CAB) { paintRooms(); return; }
   $('#specBody').innerHTML = '';
-  paintHouse(); paintProjects(); paintPrograms(); paintPlanOut();
+  paintHouse(); paintProjects(); paintPrograms();
 }
 
 // ── запросы к серверу ────────────────────────────────────────────────
@@ -2898,43 +2869,69 @@ function loadSettings() {
   return api('GET', '/api/settings').then(function (r) {
     if (r.status !== 200 || !r.data.settings) return;
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(r.data.settings)); } catch (e) { /* ignore */ }
-    if (applySettings(r.data.settings)) repaintPrices();
+    var changed = applySettings(r.data.settings);
+    if (changed) repaintPrices();
+    return changed;
   });
 }
 var NO_LINK = 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.';
 
-// ── вход в кабинет ───────────────────────────────────────────────────
-function cabinetShell(title, step) {
-  $('#modal .box').classList.add('wide');
-  $('#mTitle').textContent = title;
-  $('#mStep').textContent = step || '';
-  var body = $('#mBody'), foot = $('#mFoot');
-  body.innerHTML = ''; foot.innerHTML = '';
-  return { body: body, foot: foot };
-}
+// ── кабинет компании: отдельная страница cabinet.html ────────────────
+// разделы открываются по ссылкам #plan, #saved, #settings, #journal, #password
+var VIEWS = ['plan', 'saved', 'settings', 'journal', 'password'];
+var cab = { who: '', after: null, focus: '' };
+
 function field(label, input) {
   var f = el('label', 'cab-f');
   f.appendChild(el('span', 'fl', label));
   f.appendChild(input);
   return f;
 }
-
-function openCabinet(focus) {
-  focus = typeof focus === 'string' ? focus : '';
-  if (!getToken()) { openLogin(); return; }
-  api('GET', '/api/me').then(function (r) {
-    if (r.status === 200) { setStaff(true); showCabinet(r.data.login, focus); }
-    else if (r.status === 401) { setToken(null); setStaff(false); openLogin('Вход истёк, войдите снова.'); }
-    else openLogin(NO_LINK);
-  });
+function go(view, focus) {
+  cab.focus = focus || '';
+  if (location.hash !== '#' + view) history.pushState(null, '', '#' + view);
+  route();
 }
+function toPlan() { go('plan'); }
+function route() {
+  if ($('#cabApp').hidden) return;
+  var v = location.hash.slice(1);
+  if (VIEWS.indexOf(v) < 0) v = 'plan';
+  VIEWS.forEach(function (id) { $('#' + id).hidden = id !== v; });
+  document.querySelectorAll('#cabTabs a').forEach(function (a) {
+    if (a.getAttribute('href') !== '#' + v) { a.removeAttribute('aria-current'); return; }
+    a.setAttribute('aria-current', 'page');
+    var bar = a.parentNode;                          // на телефоне вкладки листаются: открытая всегда на виду
+    var x = a.offsetLeft - bar.offsetLeft;
+    if (x < bar.scrollLeft || x + a.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = x - 12;
+  });
+  var focus = cab.focus; cab.focus = '';
+  if (v === 'saved') renderSaved();
+  else if (v === 'settings') renderSettings(focus);
+  else if (v === 'journal') renderJournal();
+  else if (v === 'password') renderPassword();
+  if (!focus) window.scrollTo(0, 0);
+}
+function enterCabinet(who) {
+  if (who) cab.who = who;
+  $('#cabWho').textContent = cab.who;
+  var lg = $('#cabLogin'); lg.hidden = true; lg.innerHTML = '';
+  $('#cabApp').hidden = false; $('#cabTabs').hidden = false; $('#cabUser').hidden = false;
+  setStaff(true);
+  route();
+}
+function authLost(note, after) { setToken(null); setStaff(false); openLogin(note || 'Вход истёк, войдите снова.', after); }
 
-// after — что сделать сразу после входа (сохранить расчёт, открыть список); иначе откроется кабинет
+// after — что сделать сразу после входа (сохранить расчёт, открыть список)
 function openLogin(note, after) {
-  var m = cabinetShell('Вход в кабинет');
-  $('#modal .box').classList.remove('wide');
-  m.body.appendChild(el('p', 'hint', 'Кабинет для сотрудников компании: цены за м², ставки по ипотеке, нормы расхода ' +
-    'и сохранённые расчёты клиентов.'));
+  if (!CAB) { location.href = 'cabinet.html'; return; }
+  cab.after = typeof after === 'function' ? after : null;
+  $('#cabApp').hidden = true; $('#cabTabs').hidden = true; $('#cabUser').hidden = true;
+  var box = $('#cabLogin'); box.innerHTML = ''; box.hidden = false;
+  var card = el('div', 'cab-card');
+  card.appendChild(el('h1', '', 'Вход в кабинет'));
+  card.appendChild(el('p', 'hint', 'Для сотрудников компании: расчёт по плану дома, сохранённые расчёты клиентов, ' +
+    'цены и нормы расхода.'));
   var form = el('form', 'fields');
   form.noValidate = true;
   var login = el('input', 'inp');
@@ -2947,20 +2944,26 @@ function openLogin(note, after) {
   err.hidden = !note;
   err.textContent = note || '';
   form.appendChild(err);
-  var go = el('button', 'btn', 'Войти');
-  go.type = 'submit';
-  form.appendChild(go);
-  m.body.appendChild(form);
-  function submit(e) {
+  var go_ = el('button', 'btn', 'Войти');
+  go_.type = 'submit';
+  form.appendChild(go_);
+  card.appendChild(form);
+  var back = el('a', 'link', 'Вернуться на сайт');
+  back.href = './';
+  card.appendChild(back);
+  box.appendChild(card);
+  form.addEventListener('submit', function (e) {
     e.preventDefault();
     if (!login.value.trim() || !pass.value) { err.textContent = 'Впишите логин и пароль.'; err.hidden = false; return; }
-    go.disabled = true; go.textContent = 'Проверяем…';
+    go_.disabled = true; go_.textContent = 'Проверяем…';
     api('POST', '/api/login', { login: login.value.trim(), password: pass.value }).then(function (r) {
-      go.disabled = false; go.textContent = 'Войти';
+      go_.disabled = false; go_.textContent = 'Войти';
       if (r.status === 200) {
-        setToken(r.data.token); setStaff(true);
-        if (typeof after === 'function') { closeModal(); after(); } else showCabinet(r.data.login);
-        if (plan.sid && after !== saveNew) refreshEstimate();
+        setToken(r.data.token);
+        var then = cab.after; cab.after = null;
+        enterCabinet(r.data.login);
+        if (then) then();
+        if (plan.sid && then !== saveNew) refreshEstimate();
         return;
       }
       pass.value = '';
@@ -2972,52 +2975,22 @@ function openLogin(note, after) {
       } else err.textContent = NO_LINK;
       pass.focus();
     });
-  }
-  form.addEventListener('submit', submit);
-  openModal();
+  });
+  window.scrollTo(0, 0);
   login.focus();
 }
 
-function showCabinet(who, focus) {
-  var m = cabinetShell('Кабинет компании', who);
-  var body = m.body, foot = m.foot;
-
-  var top = el('div', 'cab-top');
-  top.appendChild(el('p', 'hint', 'Цены общие для сайта и Telegram-бота: после сохранения их сразу видят все.'));
-  var pw = el('button', 'link', 'Сменить пароль');
-  pw.type = 'button';
-  pw.addEventListener('click', function () { openPassword(who); });
-  var out = el('button', 'link', 'Выйти');
-  out.type = 'button';
-  out.addEventListener('click', function () {
-    api('POST', '/api/logout').then(function () { setToken(null); setStaff(false); closeModal(); toast('Вы вышли из кабинета'); });
-  });
-  top.appendChild(pw); top.appendChild(out);
-  body.appendChild(top);
-
-  var est = el('div', 'cab-sec');
-  est.innerHTML = '<div class="cab-h"><b>Расчёты клиентов</b><small>Раздел «Расчёт по плану дома» виден только после входа ' +
-    'в кабинет. Нажмите там «Сохранить расчёт», сохранённые открываются на любом устройстве после входа.</small></div>';
-  var estBtns = el('div');
-  estBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
-  var goPlan = el('button', 'btn sm', 'Перейти к расчёту по плану');
-  goPlan.type = 'button';
-  goPlan.addEventListener('click', function () { closeModal(); $('#plan').scrollIntoView({ behavior: 'smooth' }); });
-  var goSaved = el('button', 'btn ghost sm', 'Открыть сохранённые');
-  goSaved.type = 'button';
-  goSaved.addEventListener('click', openSaved);
-  estBtns.appendChild(goPlan); estBtns.appendChild(goSaved);
-  est.appendChild(estBtns);
-  body.appendChild(est);
-
+// настройки: цены, ставки, нормы и допущения; несохранённые правки не теряются при переходе между разделами
+function renderSettings(focus, fromServer) {
+  var box = $('#settingsBox');
+  if (box.dataset.ready && box.querySelector('.cab-f.changed')) { focusGroup(focus); return; }
+  box.innerHTML = ''; box.dataset.ready = '1';
   var inputs = {};
   function shown(key, k) { return typeof S[key] === 'string' ? S[key] : String(S[key] / k).replace('.', ','); }
-  var openGroup = null;
-  ADMIN_FIELDS.forEach(function (g, gi) {
-    var fold = gi >= 2;                              // нормы и допущения свёрнуты, чтобы не мешали ценам
-    var sec = el(fold ? 'details' : 'div', 'cab-sec');
-    var h = el(fold ? 'summary' : 'div', 'cab-h');
-    if (fold && focus === 'rooms' && g[0] === 'Расчёт по плану дома') { sec.open = true; openGroup = sec; }
+  ADMIN_FIELDS.forEach(function (g) {
+    var sec = el('div', 'cab-sec');
+    if (g[0] === 'Расчёт по плану дома') sec.id = 'setRooms';
+    var h = el('div', 'cab-h');
     h.innerHTML = '<b>' + g[0] + '</b><small>' + g[1] + '</small>';
     sec.appendChild(h);
     var grid = el('div', 'cab-grid');
@@ -3030,44 +3003,24 @@ function showCabinet(who, focus) {
       wrap.appendChild(inp);
       wrap.appendChild(el('span', 'u', f[2]));
       var lab = field(f[1], wrap);
-      inp.addEventListener('input', function () { lab.classList.toggle('changed', inp.value.trim() !== shown(f[0], k)); });
+      inp.addEventListener('input', function () {
+        lab.classList.toggle('changed', inp.value.trim() !== shown(f[0], k));
+        bar.classList.toggle('on', !!box.querySelector('.cab-f.changed'));
+      });
       grid.appendChild(lab);
       inputs[f[0]] = { inp: inp, text: f[3] === 'text', k: k, lab: lab };
     });
     sec.appendChild(grid);
-    body.appendChild(sec);
+    box.appendChild(sec);
   });
 
-  var journal = el('details', 'cab-sec');
-  journal.innerHTML = '<summary><b>Журнал изменений</b><small>Кто и когда менял цены — на сайте и в админ-боте.</small></summary>';
-  var list = el('div', 'cab-log');
-  journal.appendChild(list);
-  journal.addEventListener('toggle', function () {
-    if (!journal.open || list.dataset.loaded) return;
-    list.textContent = 'Загружаем…';
-    api('GET', '/api/journal').then(function (r) {
-      list.innerHTML = '';
-      if (r.status !== 200) { list.textContent = r.status === 401 ? 'Вход истёк, войдите снова.' : NO_LINK; return; }
-      list.dataset.loaded = '1';
-      if (!r.data.items.length) { list.textContent = 'Пока пусто.'; return; }
-      r.data.items.forEach(function (it) {
-        var row = el('div', 'cab-log-r');
-        var d = new Date(it.at * 1000);
-        row.appendChild(el('span', 'when', d.toLocaleDateString('ru-RU') + ' ' +
-          d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })));
-        row.appendChild(el('span', 'who', it.who));
-        row.appendChild(el('span', 'what', it.action));
-        list.appendChild(row);
-      });
-    });
-  });
-  body.appendChild(journal);
-
-  var err = el('p', 'hint bad'); err.hidden = true;
-  body.appendChild(err);
-
+  var bar = el('div', 'cab-savebar');
   var save = el('button', 'btn', 'Сохранить');
   save.type = 'button';
+  var hint = el('p', 'hint', 'Изменённые поля подсвечены, пока не нажмёте «Сохранить».');
+  var err = el('p', 'hint bad'); err.hidden = true;
+  bar.appendChild(save); bar.appendChild(hint); bar.appendChild(err);
+  box.appendChild(bar);
   save.addEventListener('click', function () {
     var diff = {}, bad = null, count = 0;
     for (var key in inputs) {
@@ -3079,7 +3032,8 @@ function showCabinet(who, focus) {
       diff[key] = Math.round(n * it.k * 10000) / 10000; count++;
     }
     if (bad) { err.textContent = 'Проверьте подсвеченное поле: нужно число.'; err.hidden = false; bad.inp.focus(); return; }
-    if (!count) { closeModal(); toast('Изменений нет'); return; }
+    if (!count) { toast('Изменений нет'); return; }
+    err.hidden = true;
     save.disabled = true; save.textContent = 'Сохраняем…';
     api('PUT', '/api/settings', { settings: diff }).then(function (r) {
       save.disabled = false; save.textContent = 'Сохранить';
@@ -3087,31 +3041,58 @@ function showCabinet(who, focus) {
         applySettings(r.data.settings);
         try { localStorage.setItem(CACHE_KEY, JSON.stringify(r.data.settings)); } catch (e) { /* ignore */ }
         repaintPrices();
-        closeModal();
+        box.dataset.ready = '';
+        renderSettings('', true);
         toast('Сохранено. Новые значения уже на сайте и в боте');
       } else if (r.status === 401) {
-        setToken(null); setStaff(false); openLogin('Вход истёк, войдите снова. Изменения не сохранились.');
+        authLost('Вход истёк, войдите снова. Изменения остались на странице: после входа нажмите «Сохранить» ещё раз.',
+          function () { go('settings'); });
       } else {
         err.textContent = r.status ? (r.data.error || 'Не получилось сохранить') : NO_LINK + ' Ничего не сохранилось.';
         err.hidden = false;
       }
     });
   });
-  var hint = el('p', 'hint');
-  hint.style.flex = '1 1 200px';
-  hint.textContent = 'Изменённые поля подсвечены, пока не нажмёте «Сохранить».';
-  foot.appendChild(save); foot.appendChild(hint);
-  if (!$('#modal').hidden) { var first = $('#mBody input'); if (first) first.focus(); } else openModal();
-  if (openGroup) { openGroup.scrollIntoView({ block: 'start' }); var fi = openGroup.querySelector('input'); if (fi) fi.focus({ preventScroll: true }); }
-  loadSettings();
+  focusGroup(focus);
+  if (fromServer) return;
+  // свежие значения с сервера: перерисовываем, только если они поменялись и никто не начал править
+  loadSettings().then(function (changed) {
+    if (changed && !box.querySelector('.cab-f.changed') && !$('#settings').hidden) { box.dataset.ready = ''; renderSettings('', true); }
+  });
+}
+function focusGroup(focus) {
+  if (focus !== 'rooms') return;
+  var g = $('#setRooms');
+  g.scrollIntoView({ block: 'start' });
+  var fi = g.querySelector('input');
+  if (fi) fi.focus({ preventScroll: true });
 }
 
-function openPassword(who) {
-  var m = cabinetShell('Смена пароля', who);
-  $('#modal .box').classList.remove('wide');
+function renderJournal() {
+  var list = $('#journalBox');
+  list.textContent = 'Загружаем…';
+  api('GET', '/api/journal').then(function (r) {
+    if (r.status === 401) { authLost('', function () { go('journal'); }); return; }
+    if (r.status !== 200) { list.textContent = NO_LINK; return; }
+    list.innerHTML = '';
+    if (!r.data.items.length) { list.textContent = 'Пока пусто.'; return; }
+    r.data.items.forEach(function (it) {
+      var row = el('div', 'cab-log-r');
+      var d = new Date(it.at * 1000);
+      row.appendChild(el('span', 'when', d.toLocaleDateString('ru-RU') + ' ' +
+        d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })));
+      row.appendChild(el('span', 'who', it.who));
+      row.appendChild(el('span', 'what', it.action));
+      list.appendChild(row);
+    });
+  });
+}
+
+function renderPassword() {
+  var box = $('#passwordBox'); box.innerHTML = '';
   var form = el('form', 'fields');
   form.noValidate = true;
-  var user = el('input'); user.type = 'text'; user.autocomplete = 'username'; user.value = who; user.hidden = true;
+  var user = el('input'); user.type = 'text'; user.autocomplete = 'username'; user.value = cab.who; user.hidden = true;
   var old = el('input', 'inp'); old.type = 'password'; old.autocomplete = 'current-password';
   var neu = el('input', 'inp'); neu.type = 'password'; neu.autocomplete = 'new-password';
   var rep = el('input', 'inp'); rep.type = 'password'; rep.autocomplete = 'new-password';
@@ -3121,24 +3102,24 @@ function openPassword(who) {
   form.appendChild(field('Новый пароль ещё раз', rep));
   var err = el('p', 'hint bad'); err.hidden = true;
   form.appendChild(err);
-  var go = el('button', 'btn', 'Сменить пароль'); go.type = 'submit';
-  var back = el('button', 'btn ghost', 'Назад'); back.type = 'button';
-  back.addEventListener('click', function () { showCabinet(who); });
-  var acts = el('div', 'po-acts'); acts.appendChild(go); acts.appendChild(back);
+  var ok = el('button', 'btn', 'Сменить пароль'); ok.type = 'submit';
+  var back = el('button', 'btn ghost', 'Отмена'); back.type = 'button';
+  back.addEventListener('click', function () { go('plan'); });
+  var acts = el('div', 'po-acts'); acts.appendChild(ok); acts.appendChild(back);
   form.appendChild(acts);
-  m.body.appendChild(form);
+  box.appendChild(form);
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     err.hidden = false;
     if (neu.value.length < 8) { err.textContent = 'Новый пароль — от 8 символов.'; neu.focus(); return; }
     if (neu.value !== rep.value) { err.textContent = 'Пароли не совпадают.'; rep.focus(); return; }
     err.hidden = true;
-    go.disabled = true;
+    ok.disabled = true;
     api('POST', '/api/password', { old: old.value, 'new': neu.value }).then(function (r) {
-      go.disabled = false;
-      if (r.status === 200) { showCabinet(who); toast('Пароль сменён. Другие входы закрыты'); return; }
-      if (r.status === 401) { setToken(null); openLogin('Вход истёк, войдите снова.'); return; }
-      if (r.status === 429) { setToken(null); openLogin('Слишком много неверных попыток. Вход закрыт на ' + (r.data.minutes || 15) + ' мин.'); return; }
+      ok.disabled = false;
+      if (r.status === 200) { toast('Пароль сменён. Другие входы закрыты'); go('plan'); return; }
+      if (r.status === 401) { authLost(); return; }
+      if (r.status === 429) { authLost('Слишком много неверных попыток. Вход закрыт на ' + (r.data.minutes || 15) + ' мин.'); return; }
       err.textContent = r.status ? (r.data.error || 'Не получилось') : NO_LINK;
       err.hidden = false;
     });
@@ -3147,17 +3128,6 @@ function openPassword(who) {
 }
 
 // ── события страницы ─────────────────────────────────────────────────
-$('#areaInp').addEventListener('input', function () { setArea(parseFloat(this.value), 'inp'); });
-$('#areaRange').addEventListener('input', function () { setArea(parseFloat(this.value), 'range'); });
-$('#plotSel').appendChild(selectBox(PLOTS, plot, function (v) { plot = v; paintHouse(); }, 'Участок'));
-$('#paySel').appendChild(selectBox(PAYS, pay, function (v) { pay = v; paintHouse(); }, 'Как планируете оплачивать'));
-$('#toMort').addEventListener('click', function () {
-  var cur = TIERS.filter(function (t) { return t.k === tier; })[0];
-  openCalc('mortgage', { price: Math.round(cur.p * area) });
-});
-$('#landGo').addEventListener('click', function () {
-  openLead('Подбор участка: ' + landPlace + ', бюджет ' + landBudget);
-});
 $('#lbClose').addEventListener('click', closeLightbox);
 (function theme() {
   var btn = $('#themeBtn'), meta = document.querySelector('meta[name="theme-color"]');
@@ -3194,69 +3164,94 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && !$('#modal').hidden) closeModal();
 });
 
-// расчёт по плану дома
-plan = loadPlan();
-paintPlaster();
-$('#planTitle').value = plan.title;
-$('#planTitle').addEventListener('input', function () {
-  plan.title = this.value.slice(0, 120); this.classList.remove('need'); touch();
-});
-$('#planNew').addEventListener('click', newPlan);
-$('#planSaved').addEventListener('click', openSaved);
-$('#addRoom').addEventListener('click', function () {
-  popMenu(this, ROOM_TYPES.map(function (t) { return { v: t, l: t[0] }; }), addRoom);
-});
-$('#planProject').addEventListener('click', function () {
-  popMenu(this, PROJECTS.filter(function (p) { return p.plan; }).map(function (p) {
-    return { v: p, l: p.title, d: p.plan.length + ' ' + plural(p.plan.length, 'комната', 'комнаты', 'комнат') +
-      ' с планировки' };
-  }), function (p) { loadProjectPlan(p); });
-});
-$('#planPhoto').addEventListener('click', function () { $('#planFile').click(); });
-$('#planFile').addEventListener('change', function () { readPlanPhoto(this.files[0]); this.value = ''; });
-$('#planClear').addEventListener('click', function () {
-  if (!plan.rooms.length) return;
-  var before = plan.rooms, src = plan.src;
-  plan.rooms = []; plan.src = '';
-  touch(); paintRooms(); paintPlanSrc();
-  toast('Список комнат очищен', 'Вернуть', function () {
-    plan.rooms = before; plan.src = src; touch(); paintRooms(); paintPlanSrc();
-  });
-});
-$('#roofOn').addEventListener('change', function () { plan.roof.on = this.checked; touch(); paintRoof(); paintPlanOut(); });
-
-// кабинет компании; режим показа в офисе убран — чистим его след на устройствах, где он был включён
+// режим показа в офисе убран — чистим его след на устройствах, где он был включён
 try { localStorage.removeItem('ds-office'); } catch (e) { /* ignore */ }
-$('#officeLink').addEventListener('click', function (e) { e.preventDefault(); openCabinet(); });
-window.addEventListener('hashchange', function () { if (location.hash === '#office') openCabinet(); });
+if (CAB) initCabinet(); else initSite();
 
-syncPrices();
-loadSettings();
-paintHouse();
-paintProjects();
-paintObjects();
-paintTiles();
-paintMemo();
-paintPrograms();
-paintServices();
-paintLand();
-paintRooms();
-paintPlanSrc();
-paintPlanRef();
-paintRoof();
-paintSave();
-stripeSections();
-// сотрудник уже входил на этом устройстве: показываем сохранение и сверяем открытый расчёт с сервером
-if (getToken()) {
-  setStaff(true);
+function initSite() {
+  // старые ссылки на кабинет внутри сайта ведут на отдельную страницу
+  if (location.hash === '#office') { location.replace('cabinet.html'); return; }
+  window.addEventListener('hashchange', function () { if (location.hash === '#office') location.href = 'cabinet.html'; });
+  $('#areaInp').addEventListener('input', function () { setArea(parseFloat(this.value), 'inp'); });
+  $('#areaRange').addEventListener('input', function () { setArea(parseFloat(this.value), 'range'); });
+  $('#plotSel').appendChild(selectBox(PLOTS, plot, function (v) { plot = v; paintHouse(); }, 'Участок'));
+  $('#paySel').appendChild(selectBox(PAYS, pay, function (v) { pay = v; paintHouse(); }, 'Как планируете оплачивать'));
+  $('#toMort').addEventListener('click', function () {
+    var cur = TIERS.filter(function (t) { return t.k === tier; })[0];
+    openCalc('mortgage', { price: Math.round(cur.p * area) });
+  });
+  $('#landGo').addEventListener('click', function () {
+    openLead('Подбор участка: ' + landPlace + ', бюджет ' + landBudget);
+  });
+  syncPrices();
+  loadSettings();
+  paintHouse();
+  paintProjects();
+  paintObjects();
+  paintTiles();
+  paintMemo();
+  paintPrograms();
+  paintServices();
+  paintLand();
+}
+
+function initCabinet() {
+  plan = loadPlan();
+  paintPlaster();
+  $('#planTitle').value = plan.title;
+  $('#planTitle').addEventListener('input', function () {
+    plan.title = this.value.slice(0, 120); this.classList.remove('need'); touch();
+  });
+  $('#planNew').addEventListener('click', newPlan);
+  $('#planSaved').addEventListener('click', openSaved);
+  $('#addRoom').addEventListener('click', function () {
+    popMenu(this, ROOM_TYPES.map(function (t) { return { v: t, l: t[0] }; }), addRoom);
+  });
+  $('#planProject').addEventListener('click', function () {
+    popMenu(this, PROJECTS.filter(function (p) { return p.plan; }).map(function (p) {
+      return { v: p, l: p.title, d: p.plan.length + ' ' + plural(p.plan.length, 'комната', 'комнаты', 'комнат') +
+        ' с планировки' };
+    }), function (p) { loadProjectPlan(p); });
+  });
+  $('#planPhoto').addEventListener('click', function () { $('#planFile').click(); });
+  $('#planFile').addEventListener('change', function () { readPlanPhoto(this.files[0]); this.value = ''; });
+  $('#planClear').addEventListener('click', function () {
+    if (!plan.rooms.length) return;
+    var before = plan.rooms, src = plan.src;
+    plan.rooms = []; plan.src = '';
+    touch(); paintRooms(); paintPlanSrc();
+    toast('Список комнат очищен', 'Вернуть', function () {
+      plan.rooms = before; plan.src = src; touch(); paintRooms(); paintPlanSrc();
+    });
+  });
+  $('#roofOn').addEventListener('change', function () { plan.roof.on = this.checked; touch(); paintRoof(); paintPlanOut(); });
+
+  $('#cabOut').addEventListener('click', function () {
+    api('POST', '/api/logout').then(function () {
+      setToken(null); setStaff(false); cab.who = ''; openLogin(); toast('Вы вышли из кабинета');
+    });
+  });
+  window.addEventListener('hashchange', route);
+  window.addEventListener('beforeunload', function (e) {
+    if ($('#settingsBox .cab-f.changed')) { e.preventDefault(); e.returnValue = ''; }
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { if (plan.sid && (plan.dirty || plan.imgDirty) && !sync.busy) syncNow(); }
+    else if (isStaff()) refreshEstimate();
+  });
+  syncPrices();
+  loadSettings();
+  paintRooms();
+  paintPlanSrc();
+  paintPlanRef();
+  paintRoof();
+  if (!getToken()) { openLogin(); return; }
+  // сотрудник уже входил на этом устройстве: открываем сразу, вход сверяем с сервером
+  enterCabinet('');
   api('GET', '/api/me').then(function (r) {
-    if (r.status === 401) { setToken(null); setStaff(false); }
-    else if (r.status === 200) refreshEstimate();
+    if (r.status === 200) { cab.who = r.data.login; $('#cabWho').textContent = cab.who; refreshEstimate(); }
+    else if (r.status === 401) authLost();
+    else toast(NO_LINK);
   });
 }
-document.addEventListener('visibilitychange', function () {
-  if (document.hidden) { if (plan.sid && (plan.dirty || plan.imgDirty) && !sync.busy) syncNow(); }
-  else if (isStaff()) refreshEstimate();
-});
-if (location.hash === '#office') openCabinet();
 })();
