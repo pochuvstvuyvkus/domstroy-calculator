@@ -22,8 +22,9 @@ var S = {
 };
 // Цены и ставки живут на сервере в общей базе с ботами: руководитель меняет их в кабинете,
 // и новые значения сразу видят все. Здесь — запасные, на случай если сервер не ответил.
-var API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
-  ? 'http://127.0.0.1:8091' : 'https://domstroy.138-124-231-240.nip.io';
+// на своём домене сервер отвечает по тому же адресу (/api), локально — отдельный порт
+var API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:8091'
+  : /github\.io$/.test(location.hostname) ? 'https://domstroy.138-124-231-240.nip.io' : '';
 var CACHE_KEY = 'ds-settings', TOKEN_KEY = 'ds-token';
 // одна и та же программа работает на сайте (index.html) и в кабинете компании (cabinet.html)
 var CAB = document.body.getAttribute('data-page') === 'cabinet';

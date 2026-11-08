@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<script>/* сайт переехал на свой домен: старые ссылки на github.io ведут туда же */
+if(/github\.io$/.test(location.hostname))location.replace("https://domstroy161-calc.ru"+location.pathname.replace(/^\/domstroy-calculator/,"")+location.search+location.hash)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Кабинет компании — ДомСтрой</title>
 <meta name="robots" content="noindex, nofollow">
@@ -13,7 +15,7 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <link rel="icon" href="img/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="img/favicon.png">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body class="cab-page" data-page="cabinet">
 
@@ -178,6 +180,6 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="print" aria-hidden="true"></div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<script>/* сайт переехал на свой домен: старые ссылки на github.io ведут туда же */
+if(/github\.io$/.test(location.hostname))location.replace("https://domstroy161-calc.ru"+location.pathname.replace(/^\/domstroy-calculator/,"")+location.search+location.hash)</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ДомСтрой — дома под ключ в Аксае и Ростове-на-Дону</title>
 <meta name="description" content="Стоимость дома, проекты с планировками, построенные объекты, калькуляторы материалов для ремонта и расчёт ипотеки. Строительная компания «ДомСтрой», Аксай.">
@@ -16,9 +18,9 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <meta property="og:type" content="website">
 <meta property="og:title" content="ДомСтрой — дома под ключ в Аксае и Ростове-на-Дону">
 <meta property="og:description" content="Стоимость дома, проекты с планировками, построенные объекты и калькуляторы материалов.">
-<meta property="og:image" content="https://pochuvstvuyvkus.github.io/domstroy-calculator/img/obj/kalinina39/1.jpg">
+<meta property="og:image" content="https://domstroy161-calc.ru/img/obj/kalinina39/1.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 
@@ -272,6 +274,6 @@ try{document.documentElement.setAttribute("data-theme",localStorage.getItem("ds-
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="print" aria-hidden="true"></div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
